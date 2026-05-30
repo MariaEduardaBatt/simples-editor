@@ -20,13 +20,16 @@ def _make_token(secret: str, *, sub: str = "user-123", email: str | None = "user
     return jwt.encode(payload, secret, algorithm="HS256")
 
 
+TEST_SECRET = "0123456789abcdef0123456789abcdef"
+
+
 def test_extract_bearer_token_happy_path():
     assert extract_bearer_token("Bearer abc.def.ghi") == "abc.def.ghi"
 
 
 @pytest.mark.parametrize("header", [None, ""])
 def test_extract_bearer_token_missing_header_raises(header):
-    with pytest.raises(AuthError, match="Authorization"):
+    with pytest.raises(AuthError, match="missing_bearer_token"):
         extract_bearer_token(header)
 
 
@@ -40,41 +43,38 @@ def test_extract_bearer_token_missing_header_raises(header):
     ],
 )
 def test_extract_bearer_token_malformed_header_raises(header):
-    with pytest.raises(AuthError, match="Malformed"):
+    with pytest.raises(AuthError, match="malformed_bearer_token"):
         extract_bearer_token(header)
 
 
 def test_verify_supabase_jwt_valid_signature_and_exp_returns_identity():
-    secret = "secret"
-    token = _make_token(secret, sub="user-123", email="user@example.com")
+    token = _make_token(TEST_SECRET, sub="user-123", email="user@example.com")
 
-    identity = verify_supabase_jwt(token, secret)
+    identity = verify_supabase_jwt(token, TEST_SECRET)
 
     assert identity == {"user_id": "user-123", "email": "user@example.com"}
 
 
 def test_verify_supabase_jwt_invalid_signature_raises_auth_error():
-    token = _make_token("correct-secret")
+    token = _make_token(TEST_SECRET)
 
-    with pytest.raises(AuthError, match="Invalid"):
-        verify_supabase_jwt(token, "wrong-secret")
+    with pytest.raises(AuthError, match="invalid_token"):
+        verify_supabase_jwt(token, "fedcba9876543210fedcba9876543210")
 
 
 def test_verify_supabase_jwt_expired_token_raises_auth_error():
-    secret = "secret"
     expired = datetime.now(tz=timezone.utc) - timedelta(minutes=1)
-    token = _make_token(secret, exp=expired)
+    token = _make_token(TEST_SECRET, exp=expired)
 
-    with pytest.raises(AuthError, match="expired"):
-        verify_supabase_jwt(token, secret)
+    with pytest.raises(AuthError, match="expired_token"):
+        verify_supabase_jwt(token, TEST_SECRET)
 
 
 def test_verify_jwt_decorator_sets_g_identity_and_invokes_wrapped_view():
-    secret = "secret"
-    token = _make_token(secret, sub="user-abc", email="decorator@example.com")
+    token = _make_token(TEST_SECRET, sub="user-abc", email="decorator@example.com")
     app = Flask(__name__)
 
-    @verify_jwt(secret)
+    @verify_jwt(TEST_SECRET)
     def view_func():
         return g.identity
 

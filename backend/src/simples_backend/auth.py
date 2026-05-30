@@ -1,33 +1,38 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from functools import wraps
-from typing import Any, Callable, TypeVar, cast
+from typing import Any, Callable, TypeVar, TypedDict, cast
 
 import jwt
 from flask import g, request
 
 
-@dataclass(frozen=True)
 class AuthError(Exception):
-    message: str
+    def __init__(self, code: str):
+        super().__init__(code)
+        self.code = code
 
-    def __str__(self) -> str:  # pragma: no cover
-        return self.message
+    def __str__(self) -> str:
+        return self.code
+
+
+class Identity(TypedDict, total=False):
+    user_id: str
+    email: str
 
 
 def extract_bearer_token(authorization_header: str | None) -> str:
     if not authorization_header:
-        raise AuthError("Missing Authorization header")
+        raise AuthError("missing_bearer_token")
 
     parts = authorization_header.strip().split()
     if len(parts) != 2 or parts[0].lower() != "bearer" or not parts[1]:
-        raise AuthError("Malformed Authorization header")
+        raise AuthError("malformed_bearer_token")
 
     return parts[1]
 
 
-def verify_supabase_jwt(token: str, secret: str) -> dict[str, str]:
+def verify_supabase_jwt(token: str, secret: str) -> Identity:
     try:
         claims = jwt.decode(
             token,
@@ -36,15 +41,15 @@ def verify_supabase_jwt(token: str, secret: str) -> dict[str, str]:
             options={"require": ["exp", "sub"]},
         )
     except jwt.ExpiredSignatureError as exc:
-        raise AuthError("Token expired") from exc
+        raise AuthError("expired_token") from exc
     except jwt.InvalidTokenError as exc:
-        raise AuthError("Invalid token") from exc
+        raise AuthError("invalid_token") from exc
 
     sub = cast(str | None, claims.get("sub"))
     if not sub:
-        raise AuthError("Invalid token")
+        raise AuthError("invalid_token")
 
-    identity: dict[str, str] = {"user_id": sub}
+    identity: Identity = {"user_id": sub}
 
     email = claims.get("email")
     if isinstance(email, str) and email:
