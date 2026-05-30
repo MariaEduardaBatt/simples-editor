@@ -1,2 +1,6 @@
 .env
 .worktrees/
+
+# Python
+__pycache__/
+*.pyc
