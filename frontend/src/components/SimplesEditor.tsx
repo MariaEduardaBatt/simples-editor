@@ -4,25 +4,28 @@ import Editor, { type BeforeMount, type OnMount } from '@monaco-editor/react'
 
 const SIMPLES_KEYWORDS = [
   "programa", "inicio", "fim",
-  "inteiro", "flutuante", "vazio",
   "se", "entao", "senao", "fimse",
-  "enquanto", "fimenquanto",
-  "para", "de", "ate", "passo", "faca", "fimpara",
+  "enquanto", "faca", "fimenquanto",
+  "para", "de", "ate", "passo", "fimpara",
   "leia", "escreva", "escreval",
-  "e", "ou", "nao",
-  "div",
   "procedimento", "retorna",
+  "e", "ou", "nao",
+  "div", "valor",
 ] as const
 
-const SIMPLES_OPERATORS = ["<-", "+", "-", "*", "div", ">", "<", "=", "<>", ">=", "<="]
+const SIMPLES_TYPES = [
+  "inteiro", "flutuante", "vazio", "string",
+] as const
+
+const SIMPLES_OPERATORS = ["<-", "+", "-", "*", ">", "<", "=", "<>", ">=", "<="]
 
 const DEFAULT_CODE = `programa exemplo
-  inteiro x
+  inteiro x;
 
 inicio
-  escreva "Digite um numero: "
-  leia x
-  escreval "Voce digitou: ", x
+  escreva "Digite um numero: ";
+  leia x;
+  escreval "Voce digitou: ", x;
 fim`
 
 function registerSimplesLanguage(monaco: Parameters<BeforeMount>[0]) {
@@ -31,20 +34,32 @@ function registerSimplesLanguage(monaco: Parameters<BeforeMount>[0]) {
   monaco.languages.setMonarchTokensProvider('simples', {
     ignoreCase: true,
     keywords: SIMPLES_KEYWORDS,
+    types: SIMPLES_TYPES,
     operators: SIMPLES_OPERATORS,
     symbols: /[=<>+\-*]+/,
     tokenizer: {
       root: [
+        [/\/\/.*$/, 'comment'],
+        [/\/\*/, 'comment', '@block_comment'],
         [/[a-zA-Z_]\w*/, {
-          cases: { '@keywords': 'keyword', '@default': 'identifier' }
+          cases: {
+            '@types': 'type',
+            '@keywords': 'keyword',
+            '@default': 'identifier',
+          }
         }],
         [/\d+\.\d+/, 'number.float'],
         [/\d+/, 'number'],
         [/<-/, 'operator'],
         [/@symbols/, { cases: { '@operators': 'operator', '@default': '' } }],
-        [/[(),;]/, 'delimiter'],
+        [/[(),;\[\]]/, 'delimiter'],
         [/"[^"]*"/, 'string'],
         [/\s+/, 'white'],
+      ],
+      block_comment: [
+        [/[^/*]+/, 'comment'],
+        [/\*\//, 'comment', '@pop'],
+        [/[/*]/, 'comment'],
       ],
     },
   })
