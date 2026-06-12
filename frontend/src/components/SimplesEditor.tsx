@@ -97,7 +97,12 @@ function registerSimplesLanguage(monaco: Parameters<BeforeMount>[0]) {
   })
 }
 
-export function SimplesEditor() {
+interface SimplesEditorProps {
+  code?: string
+  onCodeChange?: (code: string) => void
+}
+
+export function SimplesEditor({ code, onCodeChange }: SimplesEditorProps) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
 
   const handleBeforeMount: BeforeMount = useCallback((monaco) => {
@@ -113,9 +118,10 @@ export function SimplesEditor() {
       height="100%"
       language="simples"
       theme="simples-galaxy"
-      value={DEFAULT_CODE}
+      value={code ?? DEFAULT_CODE}
       beforeMount={handleBeforeMount}
       onMount={handleMount}
+      onChange={(value) => onCodeChange?.(value ?? '')}
       options={{
         minimap: { enabled: false },
         fontSize: 14,
