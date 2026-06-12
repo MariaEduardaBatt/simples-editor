@@ -1,12 +1,23 @@
+import { useState } from 'react'
+
 export function Toolbar() {
+  const [isCompiling, setIsCompiling] = useState(false)
+
+  function handleRun() {
+    setIsCompiling(true)
+    setTimeout(() => setIsCompiling(false), 2000)
+  }
+
   return (
     <div className="mx-6 flex items-center gap-3">
       <button
-        className="flex items-center gap-2 rounded-xl border border-nebula-500/30 bg-nebula-500/10 px-5 py-2 text-sm font-medium text-nebula-300 transition hover:bg-nebula-500/20 hover:text-nebula-200"
+        className="flex items-center gap-2 rounded-xl border border-nebula-500/30 bg-nebula-500/10 px-5 py-2 text-sm font-medium text-nebula-300 transition hover:bg-nebula-500/20 hover:text-nebula-200 disabled:cursor-not-allowed disabled:opacity-50"
         type="button"
+        onClick={handleRun}
+        disabled={isCompiling}
       >
-        <span className="text-base leading-none">▶</span>
-        Run
+        <span className="text-base leading-none">{isCompiling ? '◌' : '▶'}</span>
+        {isCompiling ? 'compilando…' : 'Run'}
       </button>
       <button
         className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-white/40 transition hover:border-white/20 hover:text-white/60 disabled:opacity-30"
