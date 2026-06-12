@@ -69,7 +69,7 @@ function ShootingStars() {
           key={i}
           className="fixed h-[1.5px] w-[150px] animate-shoot opacity-0"
           style={{
-            top: `${5 + i * 8}%`,
+            top: `${-20}%`,
             left: `${60 + i * 12}%`,
             rotate: '135deg',
             animationDelay: `${i * 4 + 2}s`,
