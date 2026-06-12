@@ -39,7 +39,7 @@
 **Entregáveis**:
 
 - [ ]  `simplesc` empacotado no container backend (multi-stage Dockerfile)
-- [ ]  `binutils-i686-linux-gnu` instalado, linker funciona
+- [x]  `binutils-i686-linux-gnu` instalado, linker funciona
 - [ ]  Endpoint `POST /api/compile` aceita código, retorna NASM ou erros
 - [ ]  Erros parseados em `{line, column, message}` por fase (lexer/parser/semantic)
 - [ ]  Frontend renderiza erros como **Monaco markers** (linha vermelha sublinhada)
