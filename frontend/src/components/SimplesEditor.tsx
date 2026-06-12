@@ -20,12 +20,12 @@ const SIMPLES_TYPES = [
 const SIMPLES_OPERATORS = ["<-", "+", "-", "*", ">", "<", "=", "<>", ">=", "<="]
 
 const DEFAULT_CODE = `programa exemplo
-  inteiro x;
+  inteiro x
 
 inicio
-  escreva "Digite um numero: ";
-  leia x;
-  escreval "Voce digitou: ", x;
+  escreva "Digite um numero: "
+  leia x
+  escreval "Voce digitou: ", x
 fim`
 
 function registerSimplesLanguage(monaco: Parameters<BeforeMount>[0]) {
@@ -68,31 +68,31 @@ function registerSimplesLanguage(monaco: Parameters<BeforeMount>[0]) {
     base: 'vs-dark',
     inherit: true,
     rules: [
-      { token: 'keyword', foreground: '7c3aed', fontStyle: 'bold' },
+      { token: 'keyword', foreground: 'a78bfa', fontStyle: 'bold' },
       { token: 'number', foreground: 'fbbf24' },
       { token: 'number.float', foreground: 'fbbf24' },
       { token: 'string', foreground: '67e8f9' },
       { token: 'delimiter', foreground: 'e2e8f0' },
-      { token: 'operator', foreground: 'a78bfa' },
+      { token: 'operator', foreground: 'c4b5fd' },
       { token: 'identifier', foreground: 'f1f5f9' },
-      { token: 'comment', foreground: '64748b', fontStyle: 'italic' },
-      { token: 'type', foreground: 'c4b5fd' },
+      { token: 'comment', foreground: '4a5568', fontStyle: 'italic' },
+      { token: 'type', foreground: 'ddd6fe' },
     ],
     colors: {
-      'editor.background': '#020015',
+      'editor.background': '#000008',
       'editor.foreground': '#f1f5f9',
-      'editor.lineHighlightBackground': '#0f0a2e',
-      'editor.selectionBackground': '#3b2678',
-      'editorCursor.foreground': '#7c3aed',
+      'editor.lineHighlightBackground': '#0a0418',
+      'editor.selectionBackground': '#2a1a5e',
+      'editorCursor.foreground': '#a78bfa',
       'editorCursorWidth': '2',
-      'editorLineNumber.foreground': '#1a1145',
-      'editorLineNumber.activeForeground': '#7c3aed',
-      'editor.selectionHighlightBackground': '#281a5c',
-      'editorBracketMatch.background': '#281a5c80',
+      'editorLineNumber.foreground': '#0d0a1a',
+      'editorLineNumber.activeForeground': '#8b5cf6',
+      'editor.selectionHighlightBackground': '#1f1248',
+      'editorBracketMatch.background': '#1f124880',
       'editorBracketMatch.border': '#7c3aed80',
-      'editorRuler.foreground': '#0f0a2e',
-      'editorHoverWidget.background': '#07051a',
-      'editorHoverWidget.border': '#1a1145',
+      'editorRuler.foreground': '#080810',
+      'editorHoverWidget.background': '#040308',
+      'editorHoverWidget.border': '#0d0a1a',
     },
   })
 }
