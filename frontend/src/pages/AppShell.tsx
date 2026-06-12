@@ -1,7 +1,11 @@
 import { useNavigate } from 'react-router-dom'
+import { Group, Panel, Separator } from 'react-resizable-panels'
 import { useAuth } from '../auth/useAuth'
 import { GalaxyBackground } from '../components/GalaxyBackground'
-import { SimplesEditor } from '../components/SimplesEditor'
+import { EditorPanel } from '../components/EditorPanel'
+import { NasmPanel } from '../components/NasmPanel'
+import { TerminalPanel } from '../components/TerminalPanel'
+import { Toolbar } from '../components/Toolbar'
 
 export function AppShell() {
   const navigate = useNavigate()
@@ -38,10 +42,38 @@ export function AppShell() {
         </div>
       </header>
 
-      <div className="mx-6 my-4 flex min-h-0 flex-1">
-        <section className="flex flex-1 overflow-hidden rounded-2xl border border-white/[0.06] bg-black/20 backdrop-blur-sm">
-          <SimplesEditor />
-        </section>
+      <div className="flex flex-1 flex-col overflow-hidden py-4">
+        <Toolbar />
+
+        <div className="mx-6 mt-3 min-h-0 flex-1">
+          <Group orientation="vertical" className="h-full">
+            <Panel defaultSize={70} minSize={30}>
+              <Group orientation="horizontal" className="h-full">
+                <Panel defaultSize={65} minSize={20} collapsible>
+                  <div className="h-full overflow-hidden rounded-2xl border border-white/[0.06] bg-black/20 backdrop-blur-sm">
+                    <EditorPanel />
+                  </div>
+                </Panel>
+                <Separator className="flex w-3 items-center justify-center group">
+                  <div className="h-12 w-0.5 rounded-full bg-white/[0.06] transition group-hover:bg-white/20" />
+                </Separator>
+                <Panel defaultSize={35} minSize={10} collapsible>
+                  <div className="h-full overflow-hidden rounded-2xl border border-white/[0.06] bg-black/20 backdrop-blur-sm">
+                    <NasmPanel />
+                  </div>
+                </Panel>
+              </Group>
+            </Panel>
+            <Separator className="flex h-3 items-center justify-center group">
+              <div className="h-0.5 w-12 rounded-full bg-white/[0.06] transition group-hover:bg-white/20" />
+            </Separator>
+            <Panel defaultSize={30} minSize={15}>
+              <div className="h-full overflow-hidden rounded-2xl border border-white/[0.06] bg-black/20 backdrop-blur-sm">
+                <TerminalPanel />
+              </div>
+            </Panel>
+          </Group>
+        </div>
       </div>
     </main>
   )
