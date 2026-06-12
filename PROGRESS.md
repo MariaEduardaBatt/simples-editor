@@ -2,9 +2,9 @@
 
 ## Sprint 1
 
-- [ ] feat(docs): add initial README and quickstart
+- [x] feat(docs): add initial README and quickstart
 - [ ] feat(devops): configure GitHub Project board
-- [ ] feat(devops): add base docker compose stack
+- [x] feat(devops): add base docker compose stack
 - [ ] feat(devops): make docker compose boot local stack
 - [x] feat(backend): configure Supabase auth integration
 - [x] feat(frontend): add email password login screen
