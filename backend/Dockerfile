@@ -6,6 +6,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY pyproject.toml .
+COPY wsgi.py .
 COPY src/ src/
 
 EXPOSE 5000
