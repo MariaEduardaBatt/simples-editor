@@ -46,8 +46,8 @@ export default {
           '100%': { transform: 'translateX(2500px) translateY(-100px)', opacity: '0' },
         },
         pulseGlow: {
-          '0%': { opacity: '0.4', transform: 'scale(1)' },
-          '100%': { opacity: '0.7', transform: 'scale(1.05)' },
+          '0%': { opacity: '0.15', transform: 'scale(1)' },
+          '100%': { opacity: '0.35', transform: 'scale(1.05)' },
         },
       },
     },

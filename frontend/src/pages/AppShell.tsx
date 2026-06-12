@@ -50,7 +50,7 @@ export function AppShell() {
             <Panel defaultSize={70} minSize={30}>
               <Group orientation="horizontal" className="h-full">
                 <Panel defaultSize={65} minSize={20} collapsible>
-                  <div className="h-full overflow-hidden rounded-2xl border border-white/[0.06] bg-black/20 backdrop-blur-sm">
+                  <div className="h-full overflow-hidden rounded-2xl border border-white/[0.06] bg-[#0a0a0f]">
                     <EditorPanel />
                   </div>
                 </Panel>
@@ -58,7 +58,7 @@ export function AppShell() {
                   <div className="h-12 w-0.5 rounded-full bg-white/[0.06] transition group-hover:bg-white/20" />
                 </Separator>
                 <Panel defaultSize={35} minSize={10} collapsible>
-                  <div className="h-full overflow-hidden rounded-2xl border border-white/[0.06] bg-black/20 backdrop-blur-sm">
+                  <div className="h-full overflow-hidden rounded-2xl border border-white/[0.06] bg-[#0a0a0f]">
                     <NasmPanel />
                   </div>
                 </Panel>
@@ -68,7 +68,7 @@ export function AppShell() {
               <div className="h-0.5 w-12 rounded-full bg-white/[0.06] transition group-hover:bg-white/20" />
             </Separator>
             <Panel defaultSize={30} minSize={15}>
-              <div className="h-full overflow-hidden rounded-2xl border border-white/[0.06] bg-black/20 backdrop-blur-sm">
+              <div className="h-full overflow-hidden rounded-2xl border border-white/[0.06] bg-[#0a0a0f]">
                 <TerminalPanel />
               </div>
             </Panel>
