@@ -20,6 +20,6 @@ def create_app(settings: Settings | None = None) -> Flask:
         return jsonify({"error": exc.code}), 401
 
     app.register_blueprint(create_auth_blueprint(resolved), url_prefix="/api/auth")
-    app.register_blueprint(create_health_blueprint(), url_prefix="/api/health")
+    app.register_blueprint(create_health_blueprint(resolved), url_prefix="/api/health")
 
     return app
