@@ -4,17 +4,20 @@ import Editor, { type BeforeMount, type OnMount } from '@monaco-editor/react'
 
 const SIMPLES_KEYWORDS = [
   "programa", "inicio", "fim",
-  "inteiro", "flutuante", "vazio",
   "se", "entao", "senao", "fimse",
-  "enquanto", "fimenquanto",
-  "para", "de", "ate", "passo", "faca", "fimpara",
+  "enquanto", "faca", "fimenquanto",
+  "para", "de", "ate", "passo", "fimpara",
   "leia", "escreva", "escreval",
-  "e", "ou", "nao",
-  "div",
   "procedimento", "retorna",
+  "e", "ou", "nao",
+  "div", "valor",
 ] as const
 
-const SIMPLES_OPERATORS = ["<-", "+", "-", "*", "div", ">", "<", "=", "<>", ">=", "<="]
+const SIMPLES_TYPES = [
+  "inteiro", "flutuante", "vazio", "string",
+] as const
+
+const SIMPLES_OPERATORS = ["<-", "+", "-", "*", ">", "<", "=", "<>", ">=", "<="]
 
 const DEFAULT_CODE = `programa exemplo
   inteiro x
@@ -31,20 +34,32 @@ function registerSimplesLanguage(monaco: Parameters<BeforeMount>[0]) {
   monaco.languages.setMonarchTokensProvider('simples', {
     ignoreCase: true,
     keywords: SIMPLES_KEYWORDS,
+    types: SIMPLES_TYPES,
     operators: SIMPLES_OPERATORS,
     symbols: /[=<>+\-*]+/,
     tokenizer: {
       root: [
+        [/\/\/.*$/, 'comment'],
+        [/\/\*/, 'comment', '@block_comment'],
         [/[a-zA-Z_]\w*/, {
-          cases: { '@keywords': 'keyword', '@default': 'identifier' }
+          cases: {
+            '@types': 'type',
+            '@keywords': 'keyword',
+            '@default': 'identifier',
+          }
         }],
         [/\d+\.\d+/, 'number.float'],
         [/\d+/, 'number'],
         [/<-/, 'operator'],
         [/@symbols/, { cases: { '@operators': 'operator', '@default': '' } }],
-        [/[(),;]/, 'delimiter'],
+        [/[(),;\[\]]/, 'delimiter'],
         [/"[^"]*"/, 'string'],
         [/\s+/, 'white'],
+      ],
+      block_comment: [
+        [/[^/*]+/, 'comment'],
+        [/\*\//, 'comment', '@pop'],
+        [/[/*]/, 'comment'],
       ],
     },
   })
@@ -60,24 +75,24 @@ function registerSimplesLanguage(monaco: Parameters<BeforeMount>[0]) {
       { token: 'delimiter', foreground: 'e2e8f0' },
       { token: 'operator', foreground: 'c4b5fd' },
       { token: 'identifier', foreground: 'f1f5f9' },
-      { token: 'comment', foreground: '64748b', fontStyle: 'italic' },
+      { token: 'comment', foreground: '4a5568', fontStyle: 'italic' },
       { token: 'type', foreground: 'ddd6fe' },
     ],
     colors: {
-      'editor.background': '#020015',
+      'editor.background': '#000008',
       'editor.foreground': '#f1f5f9',
-      'editor.lineHighlightBackground': '#0f0a2e',
-      'editor.selectionBackground': '#3b2678',
+      'editor.lineHighlightBackground': '#0a0418',
+      'editor.selectionBackground': '#2a1a5e',
       'editorCursor.foreground': '#a78bfa',
       'editorCursorWidth': '2',
-      'editorLineNumber.foreground': '#1a1145',
+      'editorLineNumber.foreground': '#0d0a1a',
       'editorLineNumber.activeForeground': '#8b5cf6',
-      'editor.selectionHighlightBackground': '#281a5c',
-      'editorBracketMatch.background': '#281a5c80',
+      'editor.selectionHighlightBackground': '#1f1248',
+      'editorBracketMatch.background': '#1f124880',
       'editorBracketMatch.border': '#7c3aed80',
-      'editorRuler.foreground': '#0f0a2e',
-      'editorHoverWidget.background': '#07051a',
-      'editorHoverWidget.border': '#1a1145',
+      'editorRuler.foreground': '#080810',
+      'editorHoverWidget.background': '#040308',
+      'editorHoverWidget.border': '#0d0a1a',
     },
   })
 }

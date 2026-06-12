@@ -39,7 +39,7 @@ export function AppShell() {
       </header>
 
       <div className="mx-6 my-4 flex min-h-0 flex-1">
-        <section className="glass flex flex-1 overflow-hidden rounded-2xl">
+        <section className="flex flex-1 overflow-hidden rounded-2xl border border-white/[0.06] bg-black/20 backdrop-blur-sm">
           <SimplesEditor />
         </section>
       </div>
