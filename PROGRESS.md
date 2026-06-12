@@ -6,9 +6,9 @@
 - [ ] feat(devops): configure GitHub Project board
 - [ ] feat(devops): add base docker compose stack
 - [ ] feat(devops): make docker compose boot local stack
-- [ ] feat(backend): configure Supabase auth integration
-- [ ] feat(frontend): add email password login screen
-- [ ] feat(backend): add verify_jwt auth decorator
+- [x] feat(backend): configure Supabase auth integration
+- [x] feat(frontend): add email password login screen
+- [x] feat(backend): add verify_jwt auth decorator
 - [ ] feat(backend): expose /api/health
 - [ ] feat(devops): validate team PR merge flow
 

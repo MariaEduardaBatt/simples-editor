@@ -1,10 +1,9 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
+import App from './App'
 
-import App from '../src/App'
-
-vi.mock('../src/lib/supabase', () => ({
+vi.mock('./lib/supabase', () => ({
   supabase: {
     auth: {
       getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
@@ -17,7 +16,7 @@ vi.mock('../src/lib/supabase', () => ({
   }
 }))
 
-vi.mock('../src/auth/useAuth', () => ({
+vi.mock('./auth/useAuth', () => ({
   useAuth: () => ({
     loading: false,
     session: null,
@@ -26,10 +25,10 @@ vi.mock('../src/auth/useAuth', () => ({
   })
 }))
 
-describe('App scaffold', () => {
+describe('App routing', () => {
   it('redirects unauthenticated users to /login', () => {
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={['/']}>
         <App />
       </MemoryRouter>
     )
