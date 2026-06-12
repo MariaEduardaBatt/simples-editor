@@ -19,7 +19,7 @@
 - [x] feat(frontend): add dark theme keyword highlighting
 - [x] feat(frontend): build three panel editor layout
 - [x] feat(frontend): add resizable NASM splitter
-- [ ] feat(frontend): add mock run action
+- [x] feat(frontend): add mock run action
 - [x] feat(frontend): render read-only NASM Monaco panel
 
 ## Sprint 3
