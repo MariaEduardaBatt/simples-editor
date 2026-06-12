@@ -8,6 +8,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Verify i686 linker can generate ELF i386 from NASM object
+RUN echo 'global _start\n_start:\n  mov eax, 1\n  xor ebx, ebx\n  int 0x80' > /tmp/test.asm && \
+    nasm -f elf32 /tmp/test.asm -o /tmp/test.o && \
+    i686-linux-gnu-ld -m elf_i386 /tmp/test.o -o /tmp/test && \
+    rm /tmp/test.asm /tmp/test.o /tmp/test
+
 COPY simples-compiler /opt/simples-compiler
 RUN cd /opt/simples-compiler && make && cp build/simplesc /usr/local/bin/simplesc && rm -rf /opt/simples-compiler
 
