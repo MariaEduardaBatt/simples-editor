@@ -1,11 +1,44 @@
 import { useState } from 'react'
+import { useAuth } from '../auth/useAuth'
 
-export function Toolbar() {
+interface ToolbarProps {
+  code?: string
+  onCompileResult?: (result: { nasm?: string; error?: string }) => void
+}
+
+export function Toolbar({ code, onCompileResult }: ToolbarProps) {
   const [isCompiling, setIsCompiling] = useState(false)
+  const { session } = useAuth()
 
-  function handleRun() {
+  async function handleRun() {
     setIsCompiling(true)
-    setTimeout(() => setIsCompiling(false), 2000)
+    onCompileResult?.({})
+
+    try {
+      const source = code ?? ''
+
+      const res = await fetch('/api/compile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ code: source }),
+      })
+
+      const text = await res.text()
+      if (!text) {
+        onCompileResult?.({ error: `servidor retornou ${res.status} (resposta vazia)` })
+        return
+      }
+
+      const data = JSON.parse(text)
+      onCompileResult?.(data)
+    } catch (err) {
+      onCompileResult?.({ error: String(err) })
+    } finally {
+      setIsCompiling(false)
+    }
   }
 
   return (

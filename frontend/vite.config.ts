@@ -10,6 +10,14 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.SUPABASE_URL),
       'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.SUPABASE_ANON_KEY),
     },
+    server: {
+      proxy: {
+        '/api': {
+          target: env.API_TARGET ?? 'http://localhost:5000',
+          changeOrigin: true,
+        },
+      },
+    },
     test: {
       environment: 'jsdom',
       setupFiles: './src/test/setup.ts',

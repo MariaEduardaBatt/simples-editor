@@ -4,7 +4,7 @@ from flask import Flask, jsonify
 
 from .auth import AuthError
 from .config import Settings, load_settings
-from .routes import create_auth_blueprint, create_health_blueprint
+from .routes import create_auth_blueprint, create_compile_blueprint, create_health_blueprint
 
 
 def create_app(settings: Settings | None = None) -> Flask:
@@ -20,6 +20,7 @@ def create_app(settings: Settings | None = None) -> Flask:
         return jsonify({"error": exc.code}), 401
 
     app.register_blueprint(create_auth_blueprint(resolved), url_prefix="/api/auth")
+    app.register_blueprint(create_compile_blueprint(resolved), url_prefix="/api")
     app.register_blueprint(create_health_blueprint(resolved), url_prefix="/api/health")
 
     return app

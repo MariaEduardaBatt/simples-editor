@@ -1,3 +1,4 @@
+import { useCallback, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Group, Panel, Separator } from 'react-resizable-panels'
 import { useAuth } from '../auth/useAuth'
@@ -10,6 +11,26 @@ import { Toolbar } from '../components/Toolbar'
 export function AppShell() {
   const navigate = useNavigate()
   const { session, signOut } = useAuth()
+  const [code, setCode] = useState('')
+  const [nasmOutput, setNasmOutput] = useState<string | undefined>()
+  const [terminalMessage, setTerminalMessage] = useState<string | undefined>()
+
+  const handleCodeChange = useCallback((newCode: string) => {
+    setCode(newCode)
+  }, [])
+
+  const handleCompileResult = useCallback((result: { nasm?: string; error?: string }) => {
+    if ('nasm' in result && result.nasm) {
+      setNasmOutput(result.nasm)
+      setTerminalMessage(undefined)
+    } else if ('error' in result && result.error) {
+      setNasmOutput(undefined)
+      setTerminalMessage(result.error)
+    } else {
+      setNasmOutput(result.nasm)
+      setTerminalMessage(result.error)
+    }
+  }, [])
 
   async function handleLogout() {
     await signOut()
@@ -43,7 +64,7 @@ export function AppShell() {
       </header>
 
       <div className="flex flex-1 flex-col overflow-hidden py-4">
-        <Toolbar />
+        <Toolbar code={code} onCompileResult={handleCompileResult} />
 
         <div className="mx-6 mt-3 min-h-0 flex-1">
           <Group orientation="vertical" className="h-full">
@@ -51,7 +72,7 @@ export function AppShell() {
               <Group orientation="horizontal" className="h-full">
                 <Panel defaultSize={65} minSize={20} collapsible>
                   <div className="h-full overflow-hidden rounded-2xl border border-white/[0.06] bg-[#0a0a0f]">
-                    <EditorPanel />
+                    <EditorPanel code={code} onCodeChange={handleCodeChange} />
                   </div>
                 </Panel>
                 <Separator className="flex w-3 items-center justify-center group">
@@ -59,7 +80,7 @@ export function AppShell() {
                 </Separator>
                 <Panel defaultSize={35} minSize={10} collapsible>
                   <div className="h-full overflow-hidden rounded-2xl border border-white/[0.06] bg-[#0a0a0f]">
-                    <NasmPanel />
+                    <NasmPanel code={nasmOutput} />
                   </div>
                 </Panel>
               </Group>
@@ -69,7 +90,7 @@ export function AppShell() {
             </Separator>
             <Panel defaultSize={30} minSize={15}>
               <div className="h-full overflow-hidden rounded-2xl border border-white/[0.06] bg-[#0a0a0f]">
-                <TerminalPanel />
+                <TerminalPanel message={terminalMessage} />
               </div>
             </Panel>
           </Group>

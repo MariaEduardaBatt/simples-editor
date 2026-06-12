@@ -1,4 +1,8 @@
-export function TerminalPanel() {
+interface TerminalPanelProps {
+  message?: string
+}
+
+export function TerminalPanel({ message }: TerminalPanelProps) {
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-2">
@@ -11,12 +15,20 @@ export function TerminalPanel() {
       </div>
       <div className="flex min-h-0 flex-1 items-center justify-center bg-[#0a0a0f]">
         <div className="text-center">
-          <p className="font-mono text-sm text-white/20">
-            ── Terminal aguardando execução ──
-          </p>
-          <p className="mt-2 font-mono text-xs text-white/10">
-            Pressione Run para compilar e executar seu programa
-          </p>
+          {message ? (
+            <pre className="max-w-xl whitespace-pre-wrap break-all px-4 text-left font-mono text-sm text-red-400">
+              {message}
+            </pre>
+          ) : (
+            <>
+              <p className="font-mono text-sm text-white/20">
+                ── Terminal aguardando execução ──
+              </p>
+              <p className="mt-2 font-mono text-xs text-white/10">
+                Pressione Run para compilar e executar seu programa
+              </p>
+            </>
+          )}
         </div>
       </div>
     </div>
