@@ -5,12 +5,12 @@
 - [x] feat(docs): add initial README and quickstart
 - [ ] feat(devops): configure GitHub Project board
 - [x] feat(devops): add base docker compose stack
-- [ ] feat(devops): make docker compose boot local stack
+- [x] feat(devops): make docker compose boot local stack
 - [x] feat(backend): configure Supabase auth integration
 - [x] feat(frontend): add email password login screen
 - [x] feat(backend): add verify_jwt auth decorator
 - [x] feat(backend): expose /api/health
-- [ ] feat(devops): validate team PR merge flow
+- [x] feat(devops): validate team PR merge flow
 
 ## Sprint 2
 
