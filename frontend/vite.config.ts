@@ -16,6 +16,10 @@ export default defineConfig(({ mode }) => {
           target: env.API_TARGET ?? 'http://localhost:5000',
           changeOrigin: true,
         },
+        '/ws': {
+          target: env.API_TARGET ?? 'http://localhost:5000',
+          ws: true,
+        },
       },
     },
     test: {
