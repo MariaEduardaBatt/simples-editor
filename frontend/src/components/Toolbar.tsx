@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useAuth } from '../auth/useAuth'
 
 interface CompileError {
@@ -16,10 +15,11 @@ interface CompileResult {
 interface ToolbarProps {
   code?: string
   onCompileResult?: (result: CompileResult) => void
+  isCompiling: boolean
+  setIsCompiling: (v: boolean) => void
 }
 
-export function Toolbar({ code, onCompileResult }: ToolbarProps) {
-  const [isCompiling, setIsCompiling] = useState(false)
+export function Toolbar({ code, onCompileResult, isCompiling, setIsCompiling }: ToolbarProps) {
   const { session } = useAuth()
 
   async function handleRun() {
