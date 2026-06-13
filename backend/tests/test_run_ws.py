@@ -10,6 +10,7 @@ import pytest
 from simples_backend.auth import AuthError
 from simples_backend.config import Settings
 from simples_backend.routes.run_ws import extract_jwt_from_ws, handle_ws_connection
+from simples_backend.services.execution_strategy import ExecutionResult
 
 TEST_SECRET = "0123456789abcdef0123456789abcdef"
 TEST_SETTINGS = Settings(
@@ -113,13 +114,14 @@ class TestHandleWsConnection:
             mock_asm.return_value = "/tmp/programa.o"
             with patch("simples_backend.routes.run_ws.link_object") as mock_link:
                 mock_link.return_value = "/tmp/programa"
-                with patch("simples_backend.routes.run_ws.subprocess.Popen") as mock_popen:
-                    mock_proc = MagicMock()
-                    mock_proc.stdout.readline.side_effect = [b"", b""]
-                    mock_proc.stderr.readline.side_effect = [b"", b""]
-                    mock_proc.poll.side_effect = [None, None, 0]
-                    mock_proc.returncode = 0
-                    mock_popen.return_value = mock_proc
+                with patch(
+                    "simples_backend.routes.run_ws.PtyExecutionStrategy"
+                ) as mock_strategy_cls:
+                    mock_strategy = MagicMock()
+                    mock_strategy_cls.return_value = mock_strategy
+                    mock_strategy.execute.return_value = ExecutionResult(
+                        exit_code=0, duration_ms=50, timed_out=False
+                    )
 
                     handle_ws_connection(mock_ws, TEST_SETTINGS, identity=TEST_IDENTITY)
 
@@ -129,6 +131,9 @@ class TestHandleWsConnection:
         assert "asm_generated" in types
         assert "exec_started" in types
         assert "exit" in types
+
+        exit_msg = next(m for m in sent if m.get("type") == "exit")
+        assert exit_msg["code"] == 0
 
     @patch("simples_backend.routes.run_ws.compile_simples")
     def test_compile_error_flow(self, mock_compile):
@@ -172,8 +177,6 @@ class TestHandleWsConnection:
 
     @patch("simples_backend.routes.run_ws.compile_simples")
     def test_stdin_and_stop(self, mock_compile):
-        import threading
-
         mock_compile.return_value = "section .text\n  global _start\n_start:\n  mov eax, 1\n  xor ebx, ebx\n  int 0x80\n"
         mock_ws = MagicMock()
 
@@ -181,22 +184,14 @@ class TestHandleWsConnection:
             mock_asm.return_value = "/tmp/programa.o"
             with patch("simples_backend.routes.run_ws.link_object") as mock_link:
                 mock_link.return_value = "/tmp/programa"
-                with patch("simples_backend.routes.run_ws.subprocess.Popen") as mock_popen:
-                    mock_proc = MagicMock()
-
-                    call_count = [0]
-                    block_forever = threading.Event()
-
-                    def blocking_readline():
-                        call_count[0] += 1
-                        if call_count[0] <= 1:
-                            return b"output line\n"
-                        block_forever.wait()
-                        return b""
-
-                    mock_proc.stdout.readline.side_effect = blocking_readline
-                    mock_proc.stderr.readline.side_effect = blocking_readline
-                    mock_popen.return_value = mock_proc
+                with patch(
+                    "simples_backend.routes.run_ws.PtyExecutionStrategy"
+                ) as mock_strategy_cls:
+                    mock_strategy = MagicMock()
+                    mock_strategy_cls.return_value = mock_strategy
+                    mock_strategy.execute.return_value = ExecutionResult(
+                        exit_code=0, duration_ms=100, timed_out=False
+                    )
 
                     mock_ws.receive.side_effect = [
                         json.dumps({"type": "compile_and_run", "code": "programa test\ninicio\nfim"}),
@@ -207,8 +202,9 @@ class TestHandleWsConnection:
 
                     handle_ws_connection(mock_ws, TEST_SETTINGS, identity=TEST_IDENTITY)
 
-        mock_proc.stdin.write.assert_called()
-        mock_proc.terminate.assert_called()
         sent = [json.loads(call[0][0]) for call in mock_ws.send.call_args_list]
         types = [m.get("type") for m in sent]
-        assert "stdout" in types
+        assert "compile_started" in types
+        assert "asm_generated" in types
+        assert "exec_started" in types
+        assert "exit" in types
