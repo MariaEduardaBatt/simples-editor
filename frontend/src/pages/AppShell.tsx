@@ -83,7 +83,7 @@ export function AppShell() {
     onInternalError: handleInternalError,
     onCompileStarted: handleCompileStarted,
     onExecStarted: handleExecStarted,
-  })
+  }, session?.access_token ?? '')
 
   const isRunning = ws.state !== 'idle'
 
