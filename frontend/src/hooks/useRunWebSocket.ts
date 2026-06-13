@@ -21,7 +21,7 @@ interface RunCallbacks {
   onExecStarted?: () => void
 }
 
-export function useRunWebSocket(callbacks: RunCallbacks) {
+export function useRunWebSocket(callbacks: RunCallbacks, token: string) {
   const wsRef = useRef<WebSocket | null>(null)
   const [state, setState] = useState<ConnectionState>('idle')
 
@@ -49,6 +49,7 @@ export function useRunWebSocket(callbacks: RunCallbacks) {
   }, [])
 
   const start = useCallback((code: string) => {
+    if (!token) return
     close()
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -56,7 +57,7 @@ export function useRunWebSocket(callbacks: RunCallbacks) {
     const url = `${protocol}//${host}/ws/run`
 
     setState('connecting')
-    const ws = new WebSocket(url)
+    const ws = new WebSocket(url, ['bearer.' + token])
 
     ws.onopen = () => {
       ws.send(JSON.stringify({ type: 'compile_and_run', code }))
@@ -146,7 +147,7 @@ export function useRunWebSocket(callbacks: RunCallbacks) {
     }
 
     wsRef.current = ws
-  }, [callbacks, close])
+  }, [callbacks, close, token])
 
   useEffect(() => {
     return () => {

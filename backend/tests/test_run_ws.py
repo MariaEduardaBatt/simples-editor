@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import threading
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
@@ -176,31 +177,44 @@ class TestHandleWsConnection:
         assert any(m.get("type") == "assemble_error" for m in sent)
 
     @patch("simples_backend.routes.run_ws.compile_simples")
-    def test_stdin_and_stop(self, mock_compile):
+    @patch("simples_backend.services.execution_strategy.docker")
+    def test_stdin_and_stop_through_bridge(self, mock_docker, mock_compile):
         mock_compile.return_value = "section .text\n  global _start\n_start:\n  mov eax, 1\n  xor ebx, ebx\n  int 0x80\n"
+        mock_client = MagicMock()
+        mock_docker.from_env.return_value = mock_client
+        mock_container = MagicMock()
+        mock_client.containers.run.return_value = mock_container
+        mock_sock = MagicMock()
+        mock_sock._sock = MagicMock()
+        mock_sock._sock.setblocking = MagicMock()
+        mock_container.attach_socket.return_value = mock_sock
+        mock_container.wait.return_value = {"StatusCode": 0}
+
+        reader_block = threading.Event()
+        recv_calls = iter([b"prompt> ", b"result\n"])
+
+        def mock_recv(size):
+            try:
+                return next(recv_calls)
+            except StopIteration:
+                reader_block.wait(timeout=10)
+                return b""
+
+        mock_sock._sock.recv = MagicMock(side_effect=mock_recv)
+
         mock_ws = MagicMock()
+        mock_ws.receive.side_effect = [
+            json.dumps({"type": "compile_and_run", "code": "programa test\ninicio\nfim"}),
+            json.dumps({"type": "stdin", "data": "42\n"}),
+            json.dumps({"type": "stop"}),
+            None,
+        ]
 
         with patch("simples_backend.routes.run_ws.assemble_nasm") as mock_asm:
             mock_asm.return_value = "/tmp/programa.o"
             with patch("simples_backend.routes.run_ws.link_object") as mock_link:
                 mock_link.return_value = "/tmp/programa"
-                with patch(
-                    "simples_backend.routes.run_ws.PtyExecutionStrategy"
-                ) as mock_strategy_cls:
-                    mock_strategy = MagicMock()
-                    mock_strategy_cls.return_value = mock_strategy
-                    mock_strategy.execute.return_value = ExecutionResult(
-                        exit_code=0, duration_ms=100, timed_out=False
-                    )
-
-                    mock_ws.receive.side_effect = [
-                        json.dumps({"type": "compile_and_run", "code": "programa test\ninicio\nfim"}),
-                        json.dumps({"type": "stdin", "data": "42"}),
-                        json.dumps({"type": "stop"}),
-                        None,
-                    ]
-
-                    handle_ws_connection(mock_ws, TEST_SETTINGS, identity=TEST_IDENTITY)
+                handle_ws_connection(mock_ws, TEST_SETTINGS, identity=TEST_IDENTITY)
 
         sent = [json.loads(call[0][0]) for call in mock_ws.send.call_args_list]
         types = [m.get("type") for m in sent]
@@ -208,3 +222,10 @@ class TestHandleWsConnection:
         assert "asm_generated" in types
         assert "exec_started" in types
         assert "exit" in types
+
+        stdout_msgs = [m for m in sent if m.get("type") == "stdout"]
+        assert len(stdout_msgs) >= 2
+        assert "prompt" in stdout_msgs[0].get("data", "")
+
+        mock_sock._sock.sendall.assert_called_with(b"42\n")
+        mock_container.kill.assert_any_call(signal="SIGTERM")
