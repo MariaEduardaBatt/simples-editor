@@ -5,6 +5,8 @@ from unittest.mock import patch
 
 import jwt
 
+from simples_backend.services.compiler_service import CompilerError
+
 
 def _make_token(
     secret: str,
@@ -46,9 +48,7 @@ def test_compile_compiler_error_returns_error(client, settings):
 
     with patch(
         "simples_backend.routes.compile.compile_simples",
-        side_effect=__import__("simples_backend.services.compiler_service").services.compiler_service.CompilerError(
-            "invalid character", phase="lexer", line=1, column=1
-        ),
+        side_effect=CompilerError("invalid character", phase="lexer", line=1, column=1),
     ):
         resp = client.post(
             "/api/compile",
