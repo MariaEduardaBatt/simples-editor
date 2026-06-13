@@ -106,6 +106,23 @@ def test_compile_empty_code_returns_400(client, settings):
     assert resp.get_json() == {"error": "invalid_code"}
 
 
+def test_compile_timeout_returns_explicit_error(client, settings):
+    token = _make_token(settings.supabase_jwt_secret)
+
+    with patch(
+        "simples_backend.routes.compile.compile_simples",
+        side_effect=CompilerError("timeout: compilation exceeded 15 seconds"),
+    ):
+        resp = client.post(
+            "/api/compile",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"code": CODE},
+        )
+
+    assert resp.status_code == 200
+    assert resp.get_json() == {"error": "timeout: compilation exceeded 15 seconds"}
+
+
 def test_compile_missing_token_returns_401(client):
     resp = client.post("/api/compile", json={"code": CODE})
 
