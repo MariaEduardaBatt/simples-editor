@@ -14,6 +14,7 @@ export function AppShell() {
   const [code, setCode] = useState('')
   const [nasmOutput, setNasmOutput] = useState<string | undefined>()
   const [terminalMessage, setTerminalMessage] = useState<string | undefined>()
+  const [compileMarkers, setCompileMarkers] = useState<Array<{ line: number; column: number; message: string }>>([])
 
   const handleCodeChange = useCallback((newCode: string) => {
     setCode(newCode)
@@ -23,16 +24,20 @@ export function AppShell() {
     if (result.nasm) {
       setNasmOutput(result.nasm)
       setTerminalMessage(undefined)
+      setCompileMarkers([])
     } else if (result.error) {
       setNasmOutput(undefined)
       if (typeof result.error === 'object') {
         setTerminalMessage(`[${result.error.phase}:${result.error.line}:${result.error.column}] ${result.error.message}`)
+        setCompileMarkers([{ line: result.error.line, column: result.error.column, message: result.error.message }])
       } else {
         setTerminalMessage(result.error)
+        setCompileMarkers([])
       }
     } else {
       setNasmOutput(undefined)
       setTerminalMessage(undefined)
+      setCompileMarkers([])
     }
   }, [])
 
@@ -76,7 +81,7 @@ export function AppShell() {
               <Group orientation="horizontal" className="h-full">
                 <Panel defaultSize={65} minSize={20} collapsible>
                   <div className="h-full overflow-hidden rounded-2xl border border-white/[0.06] bg-[#0a0a0f]">
-                    <EditorPanel code={code} onCodeChange={handleCodeChange} />
+                    <EditorPanel code={code} onCodeChange={handleCodeChange} markers={compileMarkers} />
                   </div>
                 </Panel>
                 <Separator className="flex w-3 items-center justify-center group">
