@@ -47,7 +47,7 @@ def test_compile_compiler_error_returns_error(client, settings):
     with patch(
         "simples_backend.routes.compile.compile_simples",
         side_effect=__import__("simples_backend.services.compiler_service").services.compiler_service.CompilerError(
-            "lexer:1:1: invalid character"
+            "invalid character", phase="lexer", line=1, column=1
         ),
     ):
         resp = client.post(
@@ -57,7 +57,14 @@ def test_compile_compiler_error_returns_error(client, settings):
         )
 
     assert resp.status_code == 200
-    assert resp.get_json() == {"error": "lexer:1:1: invalid character"}
+    assert resp.get_json() == {
+        "error": {
+            "phase": "lexer",
+            "line": 1,
+            "column": 1,
+            "message": "invalid character",
+        }
+    }
 
 
 def test_compile_missing_code_returns_400(client, settings):
