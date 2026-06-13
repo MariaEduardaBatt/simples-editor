@@ -15,6 +15,7 @@ export function AppShell() {
   const [nasmOutput, setNasmOutput] = useState<string | undefined>()
   const [terminalMessage, setTerminalMessage] = useState<string | undefined>()
   const [compileMarkers, setCompileMarkers] = useState<Array<{ line: number; column: number; message: string }>>([])
+  const [isCompiling, setIsCompiling] = useState(false)
 
   const handleCodeChange = useCallback((newCode: string) => {
     setCode(newCode)
@@ -73,7 +74,7 @@ export function AppShell() {
       </header>
 
       <div className="flex flex-1 flex-col overflow-hidden py-4">
-        <Toolbar code={code} onCompileResult={handleCompileResult} />
+        <Toolbar code={code} onCompileResult={handleCompileResult} isCompiling={isCompiling} setIsCompiling={setIsCompiling} />
 
         <div className="mx-6 mt-3 min-h-0 flex-1">
           <Group orientation="vertical" className="h-full">
@@ -89,7 +90,7 @@ export function AppShell() {
                 </Separator>
                 <Panel defaultSize={35} minSize={10} collapsible>
                   <div className="h-full overflow-hidden rounded-2xl border border-white/[0.06] bg-[#0a0a0f]">
-                    <NasmPanel code={nasmOutput} />
+                    <NasmPanel code={nasmOutput} isCompiling={isCompiling} />
                   </div>
                 </Panel>
               </Group>

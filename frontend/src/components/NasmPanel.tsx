@@ -152,9 +152,10 @@ function registerNasmLanguage(monaco: Parameters<BeforeMount>[0]) {
 
 interface NasmPanelProps {
   code?: string
+  isCompiling?: boolean
 }
 
-export function NasmPanel({ code }: NasmPanelProps) {
+export function NasmPanel({ code, isCompiling = false }: NasmPanelProps) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
 
   const handleBeforeMount: BeforeMount = useCallback((monaco) => {
@@ -164,6 +165,8 @@ export function NasmPanel({ code }: NasmPanelProps) {
   const handleMount: OnMount = useCallback((editorInstance) => {
     editorRef.current = editorInstance
   }, [])
+
+  const value = code ?? (isCompiling ? '' : DEFAULT_NASM)
 
   return (
     <div className="flex h-full flex-col">
@@ -175,12 +178,19 @@ export function NasmPanel({ code }: NasmPanelProps) {
           read-only
         </span>
       </div>
-      <div className="flex min-h-0 flex-1">
+      <div className="relative flex min-h-0 flex-1">
+        {isCompiling && !code && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#0a0a0f]">
+            <div className="text-center">
+              <p className="text-sm text-nebula-400">compilando...</p>
+            </div>
+          </div>
+        )}
         <Editor
           height="100%"
           language="nasm"
           theme="nasm-galaxy"
-          value={code ?? DEFAULT_NASM}
+          value={value}
           beforeMount={handleBeforeMount}
           onMount={handleMount}
           loading={
