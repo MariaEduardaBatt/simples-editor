@@ -1,10 +1,16 @@
 from __future__ import annotations
 
 from flask import Flask, jsonify
+from flask_sock import Sock
 
 from .auth import AuthError
 from .config import Settings, load_settings
-from .routes import create_auth_blueprint, create_compile_blueprint, create_health_blueprint
+from .routes import (
+    create_auth_blueprint,
+    create_compile_blueprint,
+    create_health_blueprint,
+    register_run_ws,
+)
 
 
 def create_app(settings: Settings | None = None) -> Flask:
@@ -22,5 +28,8 @@ def create_app(settings: Settings | None = None) -> Flask:
     app.register_blueprint(create_auth_blueprint(resolved), url_prefix="/api/auth")
     app.register_blueprint(create_compile_blueprint(resolved), url_prefix="/api")
     app.register_blueprint(create_health_blueprint(resolved), url_prefix="/api/health")
+
+    sock = Sock(app)
+    register_run_ws(sock, resolved)
 
     return app
