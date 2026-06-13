@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import type { editor } from 'monaco-editor'
 import Editor, { type BeforeMount, type OnMount } from '@monaco-editor/react'
 
@@ -97,21 +97,52 @@ function registerSimplesLanguage(monaco: Parameters<BeforeMount>[0]) {
   })
 }
 
+export interface EditorMarker {
+  line: number
+  column: number
+  message: string
+}
+
 interface SimplesEditorProps {
   code?: string
   onCodeChange?: (code: string) => void
+  markers?: EditorMarker[]
 }
 
-export function SimplesEditor({ code, onCodeChange }: SimplesEditorProps) {
+export function SimplesEditor({ code, onCodeChange, markers }: SimplesEditorProps) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
+  const monacoRef = useRef<Parameters<OnMount>[1] | null>(null)
 
   const handleBeforeMount: BeforeMount = useCallback((monaco) => {
     registerSimplesLanguage(monaco)
   }, [])
 
-  const handleMount: OnMount = useCallback((editorInstance) => {
+  const handleMount: OnMount = useCallback((editorInstance, monacoInstance) => {
     editorRef.current = editorInstance
+    monacoRef.current = monacoInstance
   }, [])
+
+  useEffect(() => {
+    const editor = editorRef.current
+    const monaco = monacoRef.current
+    if (!editor || !monaco) return
+
+    const model = editor.getModel()
+    if (!model) return
+
+    if (markers && markers.length > 0) {
+      monaco.editor.setModelMarkers(model, 'simples-editor', markers.map(m => ({
+        severity: monaco.MarkerSeverity.Error,
+        startLineNumber: m.line,
+        startColumn: m.column,
+        endLineNumber: m.line,
+        endColumn: m.column + 20,
+        message: m.message,
+      })))
+    } else {
+      monaco.editor.setModelMarkers(model, 'simples-editor', [])
+    }
+  }, [markers])
 
   return (
     <Editor

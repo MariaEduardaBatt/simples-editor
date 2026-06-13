@@ -1,11 +1,13 @@
 import { SimplesEditor } from './SimplesEditor'
+import type { EditorMarker } from './SimplesEditor'
 
 interface EditorPanelProps {
   code?: string
   onCodeChange?: (code: string) => void
+  markers?: EditorMarker[]
 }
 
-export function EditorPanel({ code, onCodeChange }: EditorPanelProps) {
+export function EditorPanel({ code, onCodeChange, markers }: EditorPanelProps) {
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-2">
@@ -14,7 +16,7 @@ export function EditorPanel({ code, onCodeChange }: EditorPanelProps) {
         </span>
       </div>
       <div className="min-h-0 flex-1">
-        <SimplesEditor code={code} onCodeChange={onCodeChange} />
+        <SimplesEditor code={code} onCodeChange={onCodeChange} markers={markers} />
       </div>
     </div>
   )
