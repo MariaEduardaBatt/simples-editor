@@ -55,12 +55,15 @@ def compile_simples(code: str) -> str:
         with open(input_path, "w", encoding="utf-8") as f:
             f.write(code)
 
-        result = subprocess.run(
-            [simplesc_path, input_path, "-o", output_path],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
+        try:
+            result = subprocess.run(
+                [simplesc_path, input_path, "-o", output_path],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+        except subprocess.TimeoutExpired:
+            raise CompilerError("timeout: compilation exceeded 15 seconds")
 
         if result.returncode != 0:
             raise _parse_stderr(result.stderr)
