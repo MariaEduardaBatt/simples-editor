@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Mapping
 
 
@@ -9,9 +9,23 @@ from typing import Mapping
 class Settings:
     supabase_url: str
     supabase_jwt_secret: str
+    exec_timeout_s: int = 10
+    compile_timeout_s: int = 15
+    max_code_kb: int = 64
+    sandbox_image: str = "simples-runner:latest"
 
 
 _REQUIRED_ENV_VARS = ("SUPABASE_URL", "SUPABASE_JWT_SECRET")
+
+
+def _int_env(env: Mapping[str, str], key: str, default: int) -> int:
+    val = env.get(key)
+    if val is None:
+        return default
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        return default
 
 
 def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
@@ -26,4 +40,8 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
     return Settings(
         supabase_url=env["SUPABASE_URL"],
         supabase_jwt_secret=env["SUPABASE_JWT_SECRET"],
+        exec_timeout_s=_int_env(env, "EXEC_TIMEOUT_S", 10),
+        compile_timeout_s=_int_env(env, "COMPILE_TIMEOUT_S", 15),
+        max_code_kb=_int_env(env, "MAX_CODE_KB", 64),
+        sandbox_image=env.get("SANDBOX_IMAGE", "simples-runner:latest"),
     )

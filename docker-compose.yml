@@ -32,4 +32,21 @@ services:
     environment:
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_JWT_SECRET=${JWT_KEY}
+      - EXEC_TIMEOUT_S=${EXEC_TIMEOUT_S:-10}
+      - COMPILE_TIMEOUT_S=${COMPILE_TIMEOUT_S:-15}
+      - MAX_CODE_KB=${MAX_CODE_KB:-64}
+      - SANDBOX_IMAGE=simples-runner:latest
+      - LOG_LEVEL=INFO
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - runner_image_build
     restart: unless-stopped
+
+  runner_image_build:
+    image: simples-runner:latest
+    build:
+      context: ./runner
+      dockerfile: Dockerfile
+    command: ["true"]
+    restart: "no"
