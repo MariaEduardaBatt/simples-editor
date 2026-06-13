@@ -19,16 +19,20 @@ export function AppShell() {
     setCode(newCode)
   }, [])
 
-  const handleCompileResult = useCallback((result: { nasm?: string; error?: string }) => {
-    if ('nasm' in result && result.nasm) {
+  const handleCompileResult = useCallback((result: { nasm?: string; error?: string | { phase: string; line: number; column: number; message: string } }) => {
+    if (result.nasm) {
       setNasmOutput(result.nasm)
       setTerminalMessage(undefined)
-    } else if ('error' in result && result.error) {
+    } else if (result.error) {
       setNasmOutput(undefined)
-      setTerminalMessage(result.error)
+      if (typeof result.error === 'object') {
+        setTerminalMessage(`[${result.error.phase}:${result.error.line}:${result.error.column}] ${result.error.message}`)
+      } else {
+        setTerminalMessage(result.error)
+      }
     } else {
-      setNasmOutput(result.nasm)
-      setTerminalMessage(result.error)
+      setNasmOutput(undefined)
+      setTerminalMessage(undefined)
     }
   }, [])
 

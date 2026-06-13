@@ -30,6 +30,15 @@ def create_compile_blueprint(settings: Settings) -> Blueprint:
             nasm = compile_simples(code)
             return jsonify({"nasm": nasm})
         except CompilerError as e:
+            if e.phase is not None:
+                return jsonify({
+                    "error": {
+                        "phase": e.phase,
+                        "line": e.line,
+                        "column": e.column,
+                        "message": e.message,
+                    }
+                })
             return jsonify({"error": e.message})
 
     return bp

@@ -1,9 +1,21 @@
 import { useState } from 'react'
 import { useAuth } from '../auth/useAuth'
 
+interface CompileError {
+  phase: string
+  line: number
+  column: number
+  message: string
+}
+
+interface CompileResult {
+  nasm?: string
+  error?: string | CompileError
+}
+
 interface ToolbarProps {
   code?: string
-  onCompileResult?: (result: { nasm?: string; error?: string }) => void
+  onCompileResult?: (result: CompileResult) => void
 }
 
 export function Toolbar({ code, onCompileResult }: ToolbarProps) {
