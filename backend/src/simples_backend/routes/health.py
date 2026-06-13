@@ -3,6 +3,8 @@ from __future__ import annotations
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
+import docker
+from docker.errors import DockerException
 from flask import Blueprint, jsonify
 
 from ..config import Settings
@@ -19,7 +21,7 @@ def create_health_blueprint(settings: Settings) -> Blueprint:
             "supabase": _check_supabase(settings.supabase_url),
             "compiler": {"status": "unavailable"},
             "nasm": {"status": "unavailable"},
-            "docker": {"status": "unavailable"},
+            "docker": _check_docker(settings.sandbox_image),
         }
         all_ok = all(c["status"] == "ok" for c in components.values())
         return jsonify(
@@ -40,3 +42,20 @@ def _check_supabase(url: str) -> dict:
         return {"status": "ok"}
     except (URLError, OSError):
         return {"status": "unavailable"}
+
+
+def _check_docker(sandbox_image: str) -> dict:
+    try:
+        client = docker.from_env()
+        client.ping()
+        try:
+            client.images.get(sandbox_image)
+            return {"status": "ok", "image": sandbox_image}
+        except docker.errors.ImageNotFound:
+            return {
+                "status": "degraded",
+                "image": sandbox_image,
+                "error": "sandbox image not found",
+            }
+    except DockerException as e:
+        return {"status": "unavailable", "error": str(e)}
