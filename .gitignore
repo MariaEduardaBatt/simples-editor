@@ -4,3 +4,7 @@
 # Python
 __pycache__/
 *.pyc
+*.egg-info/
+
+# Vite
+frontend/.vite/deps/
