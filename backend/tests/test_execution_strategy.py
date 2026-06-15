@@ -101,9 +101,10 @@ class TestPtyExecutionStrategy:
             memswap_limit="128m",
             cpu_quota=50000,
             pids_limit=64,
-            read_only=False,
+            read_only=True,
             tmpfs={"/tmp": "size=8m"},
             cap_drop=["ALL"],
+            binds={binary_dir: {"bind": "/sandbox", "mode": "ro"}},
         )
         mock_client.api.create_container.assert_called_once_with(
             image="simples-runner:latest",

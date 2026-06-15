@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-import io
 import json
-import os
-import tarfile
 import threading
 import time
 from abc import ABC, abstractmethod
@@ -39,9 +36,10 @@ class PtyExecutionStrategy(ExecutionStrategy):
             memswap_limit="128m",
             cpu_quota=50000,
             pids_limit=64,
-            read_only=False,
+            read_only=True,
             tmpfs={"/tmp": "size=8m"},
             cap_drop=["ALL"],
+            binds={binary_dir: {"bind": "/sandbox", "mode": "ro"}},
         )
         container_id = self.client.api.create_container(
             image=self.image,
@@ -54,15 +52,6 @@ class PtyExecutionStrategy(ExecutionStrategy):
             stop_timeout=self.stop_timeout_s,
         )["Id"]
         container = self.client.containers.get(container_id)
-
-        binary_path = os.path.join(binary_dir, "programa")
-        buf = io.BytesIO()
-        with tarfile.open(fileobj=buf, mode="w") as tar:
-            info = tar.gettarinfo(binary_path, arcname="programa")
-            info.mode = 0o755
-            with open(binary_path, "rb") as f:
-                tar.addfile(info, f)
-        container.put_archive("/sandbox", buf.getvalue())
 
         sock = container.attach_socket(
             params={"stdin": 1, "stdout": 1, "stderr": 1, "stream": 1}
