@@ -126,7 +126,7 @@ class PtyExecutionStrategy(ExecutionStrategy):
                 except Exception:
                     break
                 if raw is None:
-                    break
+                    continue
 
                 try:
                     msg = json.loads(raw)
