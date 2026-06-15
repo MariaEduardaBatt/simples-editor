@@ -85,7 +85,7 @@ export function AppShell() {
     onExecStarted: handleExecStarted,
   }, session?.access_token ?? '')
 
-  const isRunning = ws.state !== 'idle'
+  const isRunning = ws.state === 'connecting' || ws.state === 'compiling' || ws.state === 'executing'
 
   const handleCodeChange = useCallback((newCode: string) => {
     setCode(newCode)
