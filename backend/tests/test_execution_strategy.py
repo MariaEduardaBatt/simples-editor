@@ -84,13 +84,13 @@ class TestPtyExecutionStrategy:
 
         mock_client.containers.create.assert_called_once_with(
             image="simples-runner:latest",
-            command=["/usr/bin/qemu-i386-static", "/tmp/programa"],
+            command=["/usr/bin/qemu-i386-static", "/sandbox/programa"],
             network_mode="none",
             mem_limit="128m",
             memswap_limit="128m",
             cpu_quota=50000,
             pids_limit=64,
-            read_only=True,
+            read_only=False,
             tmpfs={"/tmp": "size=8m"},
             user="65534:65534",
             cap_drop=["ALL"],
