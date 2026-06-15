@@ -37,7 +37,7 @@ def verify_supabase_jwt(token: str, secret: str) -> Identity:
         claims = jwt.decode(
             token,
             secret,
-            algorithms=["HS256"],
+            algorithms=["HS256", "ES256"],
             options={"require": ["exp", "sub"]},
         )
     except jwt.ExpiredSignatureError as exc:
