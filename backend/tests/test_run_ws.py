@@ -14,6 +14,12 @@ from simples_backend.routes.run_ws import extract_jwt_from_ws, handle_ws_connect
 from simples_backend.services.execution_strategy import ExecutionResult
 
 TEST_SECRET = "0123456789abcdef0123456789abcdef"
+
+
+def _docker_frame(stream_id: int, payload: bytes) -> bytes:
+    return bytes([stream_id]) + b"\x00\x00\x00" + len(payload).to_bytes(4, "big") + payload
+
+
 TEST_SETTINGS = Settings(
     supabase_url="http://test",
     supabase_jwt_secret=TEST_SECRET,
@@ -191,7 +197,10 @@ class TestHandleWsConnection:
         mock_container.wait.return_value = {"StatusCode": 0}
 
         reader_block = threading.Event()
-        recv_calls = iter([b"prompt> ", b"result\n"])
+        recv_calls = iter([
+            _docker_frame(1, b"prompt> "),
+            _docker_frame(1, b"result\n"),
+        ])
 
         def mock_recv(size):
             try:
@@ -229,3 +238,43 @@ class TestHandleWsConnection:
 
         mock_sock._sock.sendall.assert_called_with(b"42\n")
         mock_container.kill.assert_any_call(signal="SIGTERM")
+
+    def test_invalid_json_discarded(self):
+        mock_ws = MagicMock()
+        mock_ws.receive.side_effect = [
+            "not json",
+            None,
+        ]
+        handle_ws_connection(mock_ws, TEST_SETTINGS, identity=TEST_IDENTITY)
+        sent = [json.loads(call[0][0]) for call in mock_ws.send.call_args_list]
+        assert sent == []
+
+    def test_stdin_in_idle_discarded(self):
+        mock_ws = MagicMock()
+        mock_ws.receive.side_effect = [
+            json.dumps({"type": "stdin", "data": "42\n"}),
+            None,
+        ]
+        handle_ws_connection(mock_ws, TEST_SETTINGS, identity=TEST_IDENTITY)
+        sent = [json.loads(call[0][0]) for call in mock_ws.send.call_args_list]
+        assert all(m.get("type") != "internal_error" for m in sent)
+
+    def test_stop_in_idle_discarded(self):
+        mock_ws = MagicMock()
+        mock_ws.receive.side_effect = [
+            json.dumps({"type": "stop"}),
+            None,
+        ]
+        handle_ws_connection(mock_ws, TEST_SETTINGS, identity=TEST_IDENTITY)
+        sent = [json.loads(call[0][0]) for call in mock_ws.send.call_args_list]
+        assert all(m.get("type") != "internal_error" for m in sent)
+
+    def test_unknown_message_type_discarded(self):
+        mock_ws = MagicMock()
+        mock_ws.receive.side_effect = [
+            json.dumps({"type": "unknown_event", "foo": "bar"}),
+            None,
+        ]
+        handle_ws_connection(mock_ws, TEST_SETTINGS, identity=TEST_IDENTITY)
+        sent = [json.loads(call[0][0]) for call in mock_ws.send.call_args_list]
+        assert all(m.get("type") != "internal_error" for m in sent)

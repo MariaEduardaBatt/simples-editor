@@ -74,15 +74,30 @@ class PtyExecutionStrategy(ExecutionStrategy):
                 pass
 
         def _reader() -> None:
+            buf = b""
             try:
                 while not stop_event.is_set():
                     try:
-                        data = sock._sock.recv(4096)
-                        if not data:
+                        chunk = sock._sock.recv(4096)
+                        if not chunk:
                             break
-                        output_queue.put(("stdout", data))
+                        buf += chunk
+                        while len(buf) >= 8:
+                            stream_id = buf[0]
+                            if stream_id not in (1, 2):
+                                break
+                            payload_len = int.from_bytes(buf[4:8], "big")
+                            frame_size = 8 + payload_len
+                            if len(buf) < frame_size:
+                                break
+                            payload = buf[8:frame_size]
+                            buf = buf[frame_size:]
+                            event = "stdout" if stream_id == 1 else "stderr"
+                            output_queue.put((event, payload))
                     except BlockingIOError:
                         time.sleep(0.01)
+                if buf:
+                    output_queue.put(("stdout", buf))
             except Exception:
                 pass
             finally:
@@ -102,7 +117,7 @@ class PtyExecutionStrategy(ExecutionStrategy):
                     if kind == "_exit":
                         break
                     _send({
-                        "type": "stdout",
+                        "type": kind,
                         "data": data.decode("utf-8", errors="replace"),
                     })
                     continue

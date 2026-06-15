@@ -14,6 +14,10 @@ from simples_backend.services.execution_strategy import (
 )
 
 
+def _docker_frame(stream_id: int, payload: bytes) -> bytes:
+    return bytes([stream_id]) + b"\x00\x00\x00" + len(payload).to_bytes(4, "big") + payload
+
+
 class TestExecutionResult:
     def test_dataclass_fields(self):
         result = ExecutionResult(exit_code=0, duration_ms=100, timed_out=False)
@@ -115,7 +119,11 @@ class TestPtyExecutionStrategy:
         mock_sock = MagicMock()
         mock_sock._sock = MagicMock()
         mock_container.attach_socket.return_value = mock_sock
-        mock_sock._sock.recv.side_effect = [b"line1\n", b"line2\n", b""]
+        mock_sock._sock.recv.side_effect = [
+            _docker_frame(1, b"line1\n"),
+            _docker_frame(1, b"line2\n"),
+            b"",
+        ]
         mock_sock._sock.setblocking = MagicMock()
         mock_container.wait.return_value = {"StatusCode": 0}
         mock_ws = MagicMock()
@@ -165,7 +173,7 @@ class TestPtyExecutionStrategy:
         mock_sock._sock.setblocking = MagicMock()
 
         reader_block = threading.Event()
-        recv_calls = iter([b"prompt> "])
+        recv_calls = iter([_docker_frame(1, b"prompt> ")])
 
         def mock_recv(size):
             try:
@@ -201,7 +209,7 @@ class TestPtyExecutionStrategy:
         mock_sock._sock.setblocking = MagicMock()
 
         reader_block = threading.Event()
-        recv_calls = iter([b"output\n"])
+        recv_calls = iter([_docker_frame(1, b"output\n")])
 
         def mock_recv(size):
             try:
@@ -237,7 +245,7 @@ class TestPtyExecutionStrategy:
         mock_sock._sock.setblocking = MagicMock()
 
         reader_block = threading.Event()
-        recv_calls = iter([b"line\n"])
+        recv_calls = iter([_docker_frame(1, b"line\n")])
 
         def mock_recv(size):
             try:
