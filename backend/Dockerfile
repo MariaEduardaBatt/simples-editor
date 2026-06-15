@@ -24,8 +24,9 @@ RUN pip install --break-system-packages --no-cache-dir -r requirements.txt
 
 COPY backend/pyproject.toml backend/wsgi.py ./
 COPY backend/src/ src/
+RUN pip install --break-system-packages --no-cache-dir -e .
 
 EXPOSE 5000
 
-CMD ["gunicorn", "-k", "geventwebsocket.gunicorn.workers.GeventWebSocketWorker", \
+CMD ["gunicorn", "-k", "gevent", \
      "-w", "4", "-b", "0.0.0.0:5000", "wsgi:app"]

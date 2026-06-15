@@ -84,7 +84,7 @@ def handle_ws_connection(ws, settings: Settings, identity: dict | None = None) -
     if identity is None:
         try:
             jwt_token = extract_jwt_from_ws()
-            identity = verify_supabase_jwt(jwt_token, settings.supabase_jwt_secret)
+            identity = verify_supabase_jwt(jwt_token, settings.supabase_jwt_secret, settings.supabase_url)
         except AuthError as e:
             _send(ws, {"type": "internal_error", "message": e.code})
             try:

@@ -15,7 +15,7 @@ class Settings:
     sandbox_image: str = "simples-runner:latest"
 
 
-_REQUIRED_ENV_VARS = ("SUPABASE_URL", "SUPABASE_JWT_SECRET")
+_REQUIRED_ENV_VARS = ("SUPABASE_URL", "JWT_SECRET")
 
 
 def _int_env(env: Mapping[str, str], key: str, default: int) -> int:
@@ -39,7 +39,7 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
 
     return Settings(
         supabase_url=env["SUPABASE_URL"],
-        supabase_jwt_secret=env["SUPABASE_JWT_SECRET"],
+        supabase_jwt_secret=env["JWT_SECRET"],
         exec_timeout_s=_int_env(env, "EXEC_TIMEOUT_S", 10),
         compile_timeout_s=_int_env(env, "COMPILE_TIMEOUT_S", 15),
         max_code_kb=_int_env(env, "MAX_CODE_KB", 64),
