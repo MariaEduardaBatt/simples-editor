@@ -59,20 +59,33 @@ class TestPtyExecutionStrategy:
         strategy = PtyExecutionStrategy(image="custom:tag")
         assert strategy.image == "custom:tag"
 
+    def _setup_mocks(self, mock_client, binary_dir, recv_side_effect=None, wait_status=0, ws_receive=None):
+        mock_container = MagicMock()
+        mock_sock = MagicMock()
+        mock_sock._sock = MagicMock()
+        mock_container.attach_socket.return_value = mock_sock
+        mock_sock._sock.setblocking = MagicMock()
+
+        if recv_side_effect is not None:
+            mock_sock._sock.recv.side_effect = recv_side_effect
+        else:
+            mock_sock._sock.recv.side_effect = [b""]
+
+        mock_container.wait.return_value = {"StatusCode": wait_status}
+        mock_ws = MagicMock()
+        mock_ws.receive.return_value = ws_receive
+
+        mock_client.api.create_host_config.return_value = {"NetworkMode": "none"}
+        mock_client.api.create_container.return_value = {"Id": "fake-container-id"}
+        mock_client.containers.get.return_value = mock_container
+
+        return mock_container, mock_sock, mock_ws
+
     @patch("simples_backend.services.execution_strategy.docker")
     def test_execute_creates_container_with_correct_params(self, mock_docker, binary_dir):
         mock_client = MagicMock()
         mock_docker.from_env.return_value = mock_client
-        mock_container = MagicMock()
-        mock_client.containers.create.return_value = mock_container
-        mock_sock = MagicMock()
-        mock_sock._sock = MagicMock()
-        mock_container.attach_socket.return_value = mock_sock
-        mock_sock._sock.recv.side_effect = [b""]
-        mock_sock._sock.setblocking = MagicMock()
-        mock_container.wait.return_value = {"StatusCode": 0}
-        mock_ws = MagicMock()
-        mock_ws.receive.return_value = None
+        mock_container, mock_sock, mock_ws = self._setup_mocks(mock_client, binary_dir)
 
         strategy = PtyExecutionStrategy()
         result = strategy.execute(binary_dir, mock_ws, timeout_s=10)
@@ -82,9 +95,7 @@ class TestPtyExecutionStrategy:
         assert result.duration_ms >= 0
         assert result.timed_out is False
 
-        mock_client.containers.create.assert_called_once_with(
-            image="simples-runner:latest",
-            command=["/usr/bin/qemu-i386-static", "/sandbox/programa"],
+        mock_client.api.create_host_config.assert_called_once_with(
             network_mode="none",
             mem_limit="128m",
             memswap_limit="128m",
@@ -92,27 +103,25 @@ class TestPtyExecutionStrategy:
             pids_limit=64,
             read_only=False,
             tmpfs={"/tmp": "size=8m"},
-            user="65534:65534",
             cap_drop=["ALL"],
+        )
+        mock_client.api.create_container.assert_called_once_with(
+            image="simples-runner:latest",
+            command=["/usr/bin/qemu-i386-static", "/sandbox/programa"],
+            user="65534:65534",
             stdin_open=True,
             tty=True,
             detach=True,
+            host_config={"NetworkMode": "none"},
+            stop_timeout=12,
         )
+        mock_client.containers.get.assert_called_once_with("fake-container-id")
 
     @patch("simples_backend.services.execution_strategy.docker")
     def test_execute_returns_result_with_exit_code_and_duration(self, mock_docker, binary_dir):
         mock_client = MagicMock()
         mock_docker.from_env.return_value = mock_client
-        mock_container = MagicMock()
-        mock_client.containers.create.return_value = mock_container
-        mock_sock = MagicMock()
-        mock_sock._sock = MagicMock()
-        mock_container.attach_socket.return_value = mock_sock
-        mock_sock._sock.recv.side_effect = [b""]
-        mock_sock._sock.setblocking = MagicMock()
-        mock_container.wait.return_value = {"StatusCode": 42}
-        mock_ws = MagicMock()
-        mock_ws.receive.return_value = None
+        mock_container, mock_sock, mock_ws = self._setup_mocks(mock_client, binary_dir, wait_status=42)
 
         strategy = PtyExecutionStrategy()
         result = strategy.execute(binary_dir, mock_ws, timeout_s=10)
@@ -124,20 +133,14 @@ class TestPtyExecutionStrategy:
     def test_stdout_forwarded_to_ws(self, mock_docker, binary_dir):
         mock_client = MagicMock()
         mock_docker.from_env.return_value = mock_client
-        mock_container = MagicMock()
-        mock_client.containers.create.return_value = mock_container
-        mock_sock = MagicMock()
-        mock_sock._sock = MagicMock()
-        mock_container.attach_socket.return_value = mock_sock
-        mock_sock._sock.recv.side_effect = [
-            _docker_frame(1, b"line1\n"),
-            _docker_frame(1, b"line2\n"),
-            b"",
-        ]
-        mock_sock._sock.setblocking = MagicMock()
-        mock_container.wait.return_value = {"StatusCode": 0}
-        mock_ws = MagicMock()
-        mock_ws.receive.return_value = None
+        mock_container, mock_sock, mock_ws = self._setup_mocks(
+            mock_client, binary_dir,
+            recv_side_effect=[
+                _docker_frame(1, b"line1\n"),
+                _docker_frame(1, b"line2\n"),
+                b"",
+            ],
+        )
 
         strategy = PtyExecutionStrategy()
         strategy.execute(binary_dir, mock_ws, timeout_s=10)
@@ -155,16 +158,7 @@ class TestPtyExecutionStrategy:
     def test_container_removed_after_execution(self, mock_docker, binary_dir):
         mock_client = MagicMock()
         mock_docker.from_env.return_value = mock_client
-        mock_container = MagicMock()
-        mock_client.containers.create.return_value = mock_container
-        mock_sock = MagicMock()
-        mock_sock._sock = MagicMock()
-        mock_container.attach_socket.return_value = mock_sock
-        mock_sock._sock.recv.side_effect = [b""]
-        mock_sock._sock.setblocking = MagicMock()
-        mock_container.wait.return_value = {"StatusCode": 0}
-        mock_ws = MagicMock()
-        mock_ws.receive.return_value = None
+        mock_container, mock_sock, mock_ws = self._setup_mocks(mock_client, binary_dir)
 
         strategy = PtyExecutionStrategy()
         strategy.execute(binary_dir, mock_ws, timeout_s=10)
@@ -175,12 +169,11 @@ class TestPtyExecutionStrategy:
     def test_stdin_forwarded_to_container(self, mock_docker, binary_dir):
         mock_client = MagicMock()
         mock_docker.from_env.return_value = mock_client
-        mock_container = MagicMock()
-        mock_client.containers.create.return_value = mock_container
-        mock_sock = MagicMock()
-        mock_sock._sock = MagicMock()
-        mock_container.attach_socket.return_value = mock_sock
-        mock_sock._sock.setblocking = MagicMock()
+        mock_container, mock_sock, mock_ws = self._setup_mocks(
+            mock_client, binary_dir,
+            recv_side_effect=[],
+            ws_receive=None,
+        )
 
         reader_block = threading.Event()
         recv_calls = iter([_docker_frame(1, b"prompt> ")])
@@ -193,7 +186,6 @@ class TestPtyExecutionStrategy:
                 return b""
 
         mock_sock._sock.recv = MagicMock(side_effect=mock_recv)
-
         mock_container.wait.return_value = {"StatusCode": 0}
 
         mock_ws = MagicMock()
@@ -211,12 +203,11 @@ class TestPtyExecutionStrategy:
     def test_stop_kills_container(self, mock_docker, binary_dir):
         mock_client = MagicMock()
         mock_docker.from_env.return_value = mock_client
-        mock_container = MagicMock()
-        mock_client.containers.create.return_value = mock_container
-        mock_sock = MagicMock()
-        mock_sock._sock = MagicMock()
-        mock_container.attach_socket.return_value = mock_sock
-        mock_sock._sock.setblocking = MagicMock()
+        mock_container, mock_sock, mock_ws = self._setup_mocks(
+            mock_client, binary_dir,
+            recv_side_effect=[],
+            ws_receive=None,
+        )
 
         reader_block = threading.Event()
         recv_calls = iter([_docker_frame(1, b"output\n")])
@@ -229,7 +220,6 @@ class TestPtyExecutionStrategy:
                 return b""
 
         mock_sock._sock.recv = MagicMock(side_effect=mock_recv)
-
         mock_container.wait.return_value = {"StatusCode": 137}
 
         mock_ws = MagicMock()
@@ -247,12 +237,11 @@ class TestPtyExecutionStrategy:
     def test_ping_pong(self, mock_docker, binary_dir):
         mock_client = MagicMock()
         mock_docker.from_env.return_value = mock_client
-        mock_container = MagicMock()
-        mock_client.containers.create.return_value = mock_container
-        mock_sock = MagicMock()
-        mock_sock._sock = MagicMock()
-        mock_container.attach_socket.return_value = mock_sock
-        mock_sock._sock.setblocking = MagicMock()
+        mock_container, mock_sock, mock_ws = self._setup_mocks(
+            mock_client, binary_dir,
+            recv_side_effect=[],
+            ws_receive=None,
+        )
 
         reader_block = threading.Event()
         recv_calls = iter([_docker_frame(1, b"line\n")])
@@ -265,7 +254,6 @@ class TestPtyExecutionStrategy:
                 return b""
 
         mock_sock._sock.recv = MagicMock(side_effect=mock_recv)
-
         mock_container.wait.return_value = {"StatusCode": 0}
 
         mock_ws = MagicMock()
@@ -288,12 +276,11 @@ class TestPtyExecutionStrategy:
     def test_timeout_triggers_kill_and_returns_timed_out(self, mock_docker, binary_dir):
         mock_client = MagicMock()
         mock_docker.from_env.return_value = mock_client
-        mock_container = MagicMock()
-        mock_client.containers.create.return_value = mock_container
-        mock_sock = MagicMock()
-        mock_sock._sock = MagicMock()
-        mock_container.attach_socket.return_value = mock_sock
-        mock_sock._sock.setblocking = MagicMock()
+        mock_container, mock_sock, mock_ws = self._setup_mocks(
+            mock_client, binary_dir,
+            recv_side_effect=[],
+            ws_receive=None,
+        )
 
         reader_block = threading.Event()
 
@@ -302,7 +289,6 @@ class TestPtyExecutionStrategy:
             return b""
 
         mock_sock._sock.recv = MagicMock(side_effect=mock_recv)
-
         mock_container.wait.return_value = {"StatusCode": 137}
 
         mock_ws = MagicMock()
@@ -314,7 +300,7 @@ class TestPtyExecutionStrategy:
         result = strategy.execute(binary_dir, mock_ws, timeout_s=0.05)
 
         assert result.timed_out is True
-        mock_container.stop.assert_called_once_with(timeout=10)
+        mock_container.stop.assert_called_once_with(timeout=12)
 
         timeout_messages = [
             json.loads(call[0][0])

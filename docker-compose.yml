@@ -39,6 +39,7 @@ services:
       - COMPILE_TIMEOUT_S=${COMPILE_TIMEOUT_S:-15}
       - MAX_CODE_KB=${MAX_CODE_KB:-64}
       - SANDBOX_IMAGE=simples-runner:latest
+      - STOP_TIMEOUT_S=${STOP_TIMEOUT_S:-12}
       - LOG_LEVEL=INFO
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

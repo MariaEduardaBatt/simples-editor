@@ -66,7 +66,7 @@ def handle_compile_and_run(ws, code: str, settings: Settings) -> ConnectionState
 
             _send(ws, {"type": "exec_started"})
 
-            strategy = PtyExecutionStrategy(image=settings.sandbox_image)
+            strategy = PtyExecutionStrategy(image=settings.sandbox_image, stop_timeout_s=settings.stop_timeout_s)
             result = strategy.execute(tmpdir, ws, settings.exec_timeout_s)
 
             if not result.timed_out:
