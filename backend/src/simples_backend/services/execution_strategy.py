@@ -127,9 +127,7 @@ class PtyExecutionStrategy(ExecutionStrategy):
                 elapsed = time.monotonic() - start
                 if elapsed > timeout_s:
                     try:
-                        container.kill(signal="SIGTERM")
-                        time.sleep(1)
-                        container.kill(signal="SIGKILL")
+                        container.stop(timeout=10)
                     except Exception:
                         pass
                     timed_out = True

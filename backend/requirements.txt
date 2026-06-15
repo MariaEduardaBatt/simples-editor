@@ -3,6 +3,5 @@ PyJWT>=2.8.0
 gunicorn>=22.0.0
 flask-sock>=0.3.0
 gevent>=23.0.0
-gevent-websocket>=0.10.1
 docker>=7.0.0
 cryptography>=42.0.0
