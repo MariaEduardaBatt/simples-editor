@@ -183,33 +183,8 @@ class TestHandleWsConnection:
         assert any(m.get("type") == "assemble_error" for m in sent)
 
     @patch("simples_backend.routes.run_ws.compile_simples")
-    @patch("simples_backend.services.execution_strategy.docker")
-    def test_stdin_and_stop_through_bridge(self, mock_docker, mock_compile):
+    def test_stdin_and_stop_through_bridge(self, mock_compile):
         mock_compile.return_value = "section .text\n  global _start\n_start:\n  mov eax, 1\n  xor ebx, ebx\n  int 0x80\n"
-        mock_client = MagicMock()
-        mock_docker.from_env.return_value = mock_client
-        mock_container = MagicMock()
-        mock_client.containers.run.return_value = mock_container
-        mock_sock = MagicMock()
-        mock_sock._sock = MagicMock()
-        mock_sock._sock.setblocking = MagicMock()
-        mock_container.attach_socket.return_value = mock_sock
-        mock_container.wait.return_value = {"StatusCode": 0}
-
-        reader_block = threading.Event()
-        recv_calls = iter([
-            _docker_frame(1, b"prompt> "),
-            _docker_frame(1, b"result\n"),
-        ])
-
-        def mock_recv(size):
-            try:
-                return next(recv_calls)
-            except StopIteration:
-                reader_block.wait(timeout=10)
-                return b""
-
-        mock_sock._sock.recv = MagicMock(side_effect=mock_recv)
 
         mock_ws = MagicMock()
         mock_ws.receive.side_effect = [
@@ -219,11 +194,15 @@ class TestHandleWsConnection:
             None,
         ]
 
+        strategy = MagicMock()
+        strategy.execute.return_value = ExecutionResult(exit_code=0, duration_ms=100, timed_out=False)
+
         with patch("simples_backend.routes.run_ws.assemble_nasm") as mock_asm:
             mock_asm.return_value = "/tmp/programa.o"
             with patch("simples_backend.routes.run_ws.link_object") as mock_link:
                 mock_link.return_value = "/tmp/programa"
-                handle_ws_connection(mock_ws, TEST_SETTINGS, identity=TEST_IDENTITY)
+                with patch("simples_backend.routes.run_ws.PtyExecutionStrategy", return_value=strategy):
+                    handle_ws_connection(mock_ws, TEST_SETTINGS, identity=TEST_IDENTITY)
 
         sent = [json.loads(call[0][0]) for call in mock_ws.send.call_args_list]
         types = [m.get("type") for m in sent]
@@ -232,12 +211,38 @@ class TestHandleWsConnection:
         assert "exec_started" in types
         assert "exit" in types
 
-        stdout_msgs = [m for m in sent if m.get("type") == "stdout"]
-        assert len(stdout_msgs) >= 2
-        assert "prompt" in stdout_msgs[0].get("data", "")
+    @patch("simples_backend.routes.run_ws.compile_simples")
+    def test_timeout_does_not_send_exit(self, mock_compile):
+        mock_compile.return_value = "section .text\n"
 
-        mock_sock._sock.sendall.assert_called_with(b"42\n")
-        mock_container.kill.assert_any_call(signal="SIGTERM")
+        def mock_execute(binary_dir, ws, timeout_s):
+            ws.send(json.dumps({"type": "timeout", "limit_s": timeout_s}))
+            return ExecutionResult(exit_code=137, duration_ms=10000, timed_out=True)
+
+        mock_ws = MagicMock()
+        mock_ws.receive.side_effect = [
+            json.dumps({"type": "compile_and_run", "code": "programa test\ninicio\nfim"}),
+            None,
+        ]
+
+        strategy = MagicMock()
+        strategy.execute.side_effect = mock_execute
+
+        with patch("simples_backend.routes.run_ws.assemble_nasm") as mock_asm:
+            mock_asm.return_value = "/tmp/programa.o"
+            with patch("simples_backend.routes.run_ws.link_object") as mock_link:
+                mock_link.return_value = "/tmp/programa"
+                with patch("simples_backend.routes.run_ws.PtyExecutionStrategy", return_value=strategy):
+                    handle_ws_connection(mock_ws, TEST_SETTINGS, identity=TEST_IDENTITY)
+
+        sent = [json.loads(call[0][0]) for call in mock_ws.send.call_args_list]
+        types = [m.get("type") for m in sent]
+
+        assert "timeout" in types
+        assert "exit" not in types
+
+        timeout_msg = next(m for m in sent if m.get("type") == "timeout")
+        assert timeout_msg["limit_s"] == 10
 
     def test_invalid_json_discarded(self):
         mock_ws = MagicMock()

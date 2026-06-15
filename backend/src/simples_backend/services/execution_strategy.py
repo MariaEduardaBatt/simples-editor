@@ -34,13 +34,13 @@ class PtyExecutionStrategy(ExecutionStrategy):
     def execute(self, binary_dir: str, ws, timeout_s: int) -> ExecutionResult:
         container = self.client.containers.create(
             image=self.image,
-            command=["/usr/bin/qemu-i386-static", "/sandbox/programa"],
+            command=["/usr/bin/qemu-i386-static", "/tmp/programa"],
             network_mode="none",
             mem_limit="128m",
             memswap_limit="128m",
             cpu_quota=50000,
             pids_limit=64,
-            read_only=False,
+            read_only=True,
             tmpfs={"/tmp": "size=8m"},
             user="65534:65534",
             cap_drop=["ALL"],
@@ -56,7 +56,7 @@ class PtyExecutionStrategy(ExecutionStrategy):
             info.mode = 0o755
             with open(binary_path, "rb") as f:
                 tar.addfile(info, f)
-        container.put_archive("/sandbox", buf.getvalue())
+        container.put_archive("/tmp", buf.getvalue())
 
         sock = container.attach_socket(
             params={"stdin": 1, "stdout": 1, "stderr": 1, "stream": 1}
@@ -127,9 +127,7 @@ class PtyExecutionStrategy(ExecutionStrategy):
                 elapsed = time.monotonic() - start
                 if elapsed > timeout_s:
                     try:
-                        container.kill(signal="SIGTERM")
-                        time.sleep(1)
-                        container.kill(signal="SIGKILL")
+                        container.stop(timeout=10)
                     except Exception:
                         pass
                     timed_out = True

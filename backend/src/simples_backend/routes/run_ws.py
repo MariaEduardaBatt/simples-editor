@@ -69,11 +69,12 @@ def handle_compile_and_run(ws, code: str, settings: Settings) -> ConnectionState
             strategy = PtyExecutionStrategy(image=settings.sandbox_image)
             result = strategy.execute(tmpdir, ws, settings.exec_timeout_s)
 
-            _send(ws, {
-                "type": "exit",
-                "code": result.exit_code,
-                "duration_ms": result.duration_ms,
-            })
+            if not result.timed_out:
+                _send(ws, {
+                    "type": "exit",
+                    "code": result.exit_code,
+                    "duration_ms": result.duration_ms,
+                })
 
     except CompilerError as e:
         if e.phase is not None:

@@ -142,7 +142,7 @@ export function useRunWebSocket(callbacks: RunCallbacks, token: string) {
     ws.onclose = () => {
       if (wsRef.current === ws) {
         wsRef.current = null
-        setState((prev) => (prev === 'idle' ? prev : 'done'))
+        setState((prev) => (prev === 'idle' || prev === 'error' ? prev : 'done'))
       }
     }
 
