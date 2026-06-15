@@ -34,7 +34,7 @@ services:
       - "5000"
     environment:
       - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_JWT_SECRET=${JWT_KEY}
+      - JWT_SECRET=${JWT_KEY}
       - EXEC_TIMEOUT_S=${EXEC_TIMEOUT_S:-10}
       - COMPILE_TIMEOUT_S=${COMPILE_TIMEOUT_S:-15}
       - MAX_CODE_KB=${MAX_CODE_KB:-64}
