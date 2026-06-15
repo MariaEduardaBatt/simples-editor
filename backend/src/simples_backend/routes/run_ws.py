@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import logging
 import tempfile
+from enum import Enum, auto
 
 from flask import request
 from flask_sock import Sock
@@ -12,7 +14,15 @@ from ..services.compiler_service import CompilerError, compile_simples
 from ..services.execution_service import ExecutionError, assemble_nasm, link_object
 from ..services.execution_strategy import PtyExecutionStrategy
 
+logger = logging.getLogger(__name__)
+
 MAX_CODE_BYTES = 64 * 1024
+
+
+class ConnectionState(Enum):
+    IDLE = auto()
+    COMPILING = auto()
+    EXECUTING = auto()
 
 
 def extract_jwt_from_ws() -> str:
@@ -34,7 +44,7 @@ def _send(ws, msg: dict) -> None:
         pass
 
 
-def handle_compile_and_run(ws, code: str, settings: Settings) -> None:
+def handle_compile_and_run(ws, code: str, settings: Settings) -> ConnectionState:
     _send(ws, {"type": "compile_started"})
 
     try:
@@ -46,13 +56,13 @@ def handle_compile_and_run(ws, code: str, settings: Settings) -> None:
                 obj_path = assemble_nasm(nasm, tmpdir, settings.compile_timeout_s)
             except ExecutionError as e:
                 _send(ws, {"type": "assemble_error", "stderr": e.message})
-                return
+                return ConnectionState.IDLE
 
             try:
                 bin_path = link_object(obj_path, tmpdir, settings.compile_timeout_s)
             except ExecutionError as e:
                 _send(ws, {"type": "link_error", "stderr": e.message})
-                return
+                return ConnectionState.IDLE
 
             _send(ws, {"type": "exec_started"})
 
@@ -79,6 +89,8 @@ def handle_compile_and_run(ws, code: str, settings: Settings) -> None:
     except Exception as e:
         _send(ws, {"type": "internal_error", "message": str(e)})
 
+    return ConnectionState.IDLE
+
 
 def handle_ws_connection(ws, settings: Settings, identity: dict | None = None) -> None:
     if identity is None:
@@ -93,6 +105,8 @@ def handle_ws_connection(ws, settings: Settings, identity: dict | None = None) -
                 pass
             return
 
+    state = ConnectionState.IDLE
+
     while True:
         try:
             raw = ws.receive()
@@ -104,6 +118,7 @@ def handle_ws_connection(ws, settings: Settings, identity: dict | None = None) -
         try:
             msg = json.loads(raw)
         except json.JSONDecodeError:
+            logger.warning("invalid frame discarded (not JSON)")
             continue
 
         t = msg.get("type", "")
@@ -112,19 +127,34 @@ def handle_ws_connection(ws, settings: Settings, identity: dict | None = None) -
             _send(ws, {"type": "pong"})
             continue
 
-        if t != "compile_and_run":
+        if t == "compile_and_run":
+            if state != ConnectionState.IDLE:
+                logger.warning("ignored compile_and_run in state %s", state.name)
+                continue
+
+            code = msg.get("code", "")
+            if not isinstance(code, str) or not code.strip():
+                _send(ws, {"type": "internal_error", "message": "missing code"})
+                continue
+
+            if len(code.encode("utf-8")) > MAX_CODE_BYTES:
+                _send(ws, {"type": "internal_error", "message": "code_too_large"})
+                continue
+
+            state = ConnectionState.COMPILING
+            state = handle_compile_and_run(ws, code, settings)
             continue
 
-        code = msg.get("code", "")
-        if not isinstance(code, str) or not code.strip():
-            _send(ws, {"type": "internal_error", "message": "missing code"})
+        if t == "stdin" and state != ConnectionState.EXECUTING:
+            logger.warning("ignored stdin in state %s", state.name)
             continue
 
-        if len(code.encode("utf-8")) > MAX_CODE_BYTES:
-            _send(ws, {"type": "internal_error", "message": "code_too_large"})
+        if t == "stop" and state != ConnectionState.EXECUTING:
+            logger.warning("ignored stop in state %s", state.name)
             continue
 
-        handle_compile_and_run(ws, code, settings)
+        if t not in ("ping", "compile_and_run", "stdin", "stop"):
+            logger.warning("unknown message type '%s' discarded in state %s", t, state.name)
 
 
 def register_run_ws(sock: Sock, settings: Settings) -> None:
