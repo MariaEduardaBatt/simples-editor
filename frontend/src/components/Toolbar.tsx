@@ -14,7 +14,7 @@ export function Toolbar({ code, onRun, onStop, isRunning }: ToolbarProps) {
   return (
     <div className="mx-6 flex items-center gap-3">
       <button
-        className="flex items-center gap-2 rounded-xl border border-nebula-500/30 bg-nebula-500/10 px-5 py-2 text-sm font-medium text-nebula-300 transition hover:bg-nebula-500/20 hover:text-nebula-200 disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex items-center gap-2 rounded-xl border border-nebula-500/30 bg-nebula-500/10 px-5 py-2 text-sm font-medium text-nebula-300 transition enabled:border-nebula-400/60 enabled:bg-nebula-500/20 enabled:text-nebula-200 enabled:hover:bg-nebula-500/30 enabled:hover:text-nebula-100 disabled:cursor-not-allowed disabled:opacity-50"
         type="button"
         onClick={handleRun}
         disabled={isRunning}
@@ -23,7 +23,7 @@ export function Toolbar({ code, onRun, onStop, isRunning }: ToolbarProps) {
         {isRunning ? 'executando…' : 'Run'}
       </button>
       <button
-        className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-white/40 transition hover:border-white/20 hover:text-white/60 disabled:opacity-30"
+        className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-white/40 transition enabled:border-red-500/50 enabled:bg-red-500/10 enabled:text-red-300 enabled:hover:border-red-400 enabled:hover:bg-red-500/20 enabled:hover:text-red-200 disabled:opacity-30"
         type="button"
         onClick={onStop}
         disabled={!isRunning}
