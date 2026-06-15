@@ -27,14 +27,13 @@ class ExecutionStrategy(ABC):
 
 
 class PtyExecutionStrategy(ExecutionStrategy):
-    def __init__(self, image: str = "simples-runner:latest"):
+    def __init__(self, image: str = "simples-runner:latest", stop_timeout_s: int = 12):
         self.image = image
+        self.stop_timeout_s = stop_timeout_s
         self.client = docker.from_env()
 
     def execute(self, binary_dir: str, ws, timeout_s: int) -> ExecutionResult:
-        container = self.client.containers.create(
-            image=self.image,
-            command=["/usr/bin/qemu-i386-static", "/sandbox/programa"],
+        host_config = self.client.api.create_host_config(
             network_mode="none",
             mem_limit="128m",
             memswap_limit="128m",
@@ -42,12 +41,19 @@ class PtyExecutionStrategy(ExecutionStrategy):
             pids_limit=64,
             read_only=False,
             tmpfs={"/tmp": "size=8m"},
-            user="65534:65534",
             cap_drop=["ALL"],
+        )
+        container_id = self.client.api.create_container(
+            image=self.image,
+            command=["/usr/bin/qemu-i386-static", "/sandbox/programa"],
+            user="65534:65534",
             stdin_open=True,
             tty=True,
             detach=True,
-        )
+            host_config=host_config,
+            stop_timeout=self.stop_timeout_s,
+        )["Id"]
+        container = self.client.containers.get(container_id)
 
         binary_path = os.path.join(binary_dir, "programa")
         buf = io.BytesIO()
@@ -127,7 +133,7 @@ class PtyExecutionStrategy(ExecutionStrategy):
                 elapsed = time.monotonic() - start
                 if elapsed > timeout_s:
                     try:
-                        container.stop(timeout=10)
+                        container.stop(timeout=self.stop_timeout_s)
                     except Exception:
                         pass
                     timed_out = True

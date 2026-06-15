@@ -13,6 +13,7 @@ class Settings:
     compile_timeout_s: int = 15
     max_code_kb: int = 64
     sandbox_image: str = "simples-runner:latest"
+    stop_timeout_s: int = 12
 
 
 _REQUIRED_ENV_VARS = ("SUPABASE_URL", "JWT_SECRET")
@@ -44,4 +45,5 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         compile_timeout_s=_int_env(env, "COMPILE_TIMEOUT_S", 15),
         max_code_kb=_int_env(env, "MAX_CODE_KB", 64),
         sandbox_image=env.get("SANDBOX_IMAGE", "simples-runner:latest"),
+        stop_timeout_s=_int_env(env, "STOP_TIMEOUT_S", 12),
     )
