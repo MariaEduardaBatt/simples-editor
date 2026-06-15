@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import io
 import json
+import os
+import tarfile
 import threading
 import time
 from abc import ABC, abstractmethod
@@ -29,16 +32,15 @@ class PtyExecutionStrategy(ExecutionStrategy):
         self.client = docker.from_env()
 
     def execute(self, binary_dir: str, ws, timeout_s: int) -> ExecutionResult:
-        container = self.client.containers.run(
+        container = self.client.containers.create(
             image=self.image,
             command=["/usr/bin/qemu-i386-static", "/sandbox/programa"],
-            volumes={binary_dir: {"bind": "/sandbox", "mode": "ro"}},
             network_mode="none",
             mem_limit="128m",
             memswap_limit="128m",
             cpu_quota=50000,
             pids_limit=64,
-            read_only=True,
+            read_only=False,
             tmpfs={"/tmp": "size=8m"},
             user="65534:65534",
             cap_drop=["ALL"],
@@ -47,6 +49,15 @@ class PtyExecutionStrategy(ExecutionStrategy):
             detach=True,
         )
 
+        binary_path = os.path.join(binary_dir, "programa")
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w") as tar:
+            info = tar.gettarinfo(binary_path, arcname="programa")
+            info.mode = 0o755
+            with open(binary_path, "rb") as f:
+                tar.addfile(info, f)
+        container.put_archive("/sandbox", buf.getvalue())
+
         sock = container.attach_socket(
             params={"stdin": 1, "stdout": 1, "stderr": 1, "stream": 1}
         )
@@ -54,7 +65,6 @@ class PtyExecutionStrategy(ExecutionStrategy):
 
         output_queue: Queue[tuple[str, object]] = Queue()
         stop_event = threading.Event()
-        start = time.monotonic()
         timed_out = False
 
         def _send(msg: dict) -> None:
@@ -80,6 +90,10 @@ class PtyExecutionStrategy(ExecutionStrategy):
 
         reader_thread = threading.Thread(target=_reader, daemon=True)
         reader_thread.start()
+
+        container.start()
+
+        start = time.monotonic()
 
         try:
             while True:
