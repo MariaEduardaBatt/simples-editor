@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from flask import Flask, jsonify
 from flask_sock import Sock
 
@@ -20,6 +22,7 @@ _sws.Server.choose_subprotocol = lambda self, req: (
 
 
 def create_app(settings: Settings | None = None) -> Flask:
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
     """Flask application factory."""
 
     app = Flask(__name__)
