@@ -12,6 +12,12 @@ from .routes import (
     register_run_ws,
 )
 
+import simple_websocket.ws as _sws
+_original_choose = _sws.Server.choose_subprotocol
+_sws.Server.choose_subprotocol = lambda self, req: (
+    req.subprotocols[0] if req.subprotocols else None
+)
+
 
 def create_app(settings: Settings | None = None) -> Flask:
     """Flask application factory."""
