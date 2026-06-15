@@ -81,6 +81,8 @@ def verify_supabase_jwt(token: str, secret: str, supabase_url: str = "") -> Iden
 
         claims = None
 
+        verify_opts = {"require": ["exp", "sub"], "verify_aud": False}
+
         if alg == "ES256":
             try:
                 keys = _get_jwks_keys(supabase_url)
@@ -91,7 +93,7 @@ def verify_supabase_jwt(token: str, secret: str, supabase_url: str = "") -> Iden
                         token,
                         pubkey,
                         algorithms=["ES256"],
-                        options={"require": ["exp", "sub"]},
+                        options=verify_opts,
                     )
                     logger.info("JWT verified with ES256+JWKS")
                 else:
@@ -99,14 +101,14 @@ def verify_supabase_jwt(token: str, secret: str, supabase_url: str = "") -> Iden
             except Exception as exc:
                 logger.error("ES256+JWKS failed: %s: %s", type(exc).__name__, exc)
 
-        if claims is None:
+        if claims is None and alg == "HS256":
             claims = jwt.decode(
                 token,
                 secret,
                 algorithms=["HS256"],
-                options={"require": ["exp", "sub"]},
+                options=verify_opts,
             )
-            logger.info("JWT verified with HS256 fallback")
+            logger.info("JWT verified with HS256")
 
     except jwt.ExpiredSignatureError as exc:
         raise AuthError("expired_token") from exc
