@@ -120,6 +120,7 @@ export function SimplesEditor({ code, onCodeChange, markers }: SimplesEditorProp
   const handleMount: OnMount = useCallback((editorInstance, monacoInstance) => {
     editorRef.current = editorInstance
     monacoRef.current = monacoInstance
+    ;(window as unknown as Record<string, unknown>).__monacoEditor = editorInstance
   }, [])
 
   useEffect(() => {
