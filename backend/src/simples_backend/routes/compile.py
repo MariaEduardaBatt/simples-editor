@@ -8,6 +8,7 @@ from flask_limiter import Limiter
 
 from ..auth import verify_jwt
 from ..config import Settings
+from ..metrics import compile_duration, compile_errors_total, executions_total
 from ..services.compiler_service import CompilerError, compile_simples
 
 logger = logging.getLogger(__name__)
@@ -47,19 +48,24 @@ def create_compile_blueprint(
         start = time.monotonic()
         try:
             nasm = compile_simples(code)
-            elapsed = int((time.monotonic() - start) * 1000)
+            elapsed = time.monotonic() - start
+            compile_duration.observe(elapsed)
+            executions_total.labels(status="success").inc()
             logger.info(
                 "compile ok user=%s duration_ms=%d",
-                _user_key(), elapsed,
-                extra={"duration_ms": elapsed},
+                _user_key(), int(elapsed * 1000),
+                extra={"duration_ms": int(elapsed * 1000)},
             )
             return jsonify({"nasm": nasm})
         except CompilerError as e:
-            elapsed = int((time.monotonic() - start) * 1000)
+            elapsed = time.monotonic() - start
+            compile_duration.observe(elapsed)
+            compile_errors_total.labels(error_type=e.phase or "unknown").inc()
+            executions_total.labels(status="error").inc()
             logger.warning(
                 "compile error user=%s duration_ms=%d: %s",
-                _user_key(), elapsed, e.message,
-                extra={"duration_ms": elapsed},
+                _user_key(), int(elapsed * 1000), e.message,
+                extra={"duration_ms": int(elapsed * 1000)},
             )
             if e.phase is not None:
                 return jsonify({

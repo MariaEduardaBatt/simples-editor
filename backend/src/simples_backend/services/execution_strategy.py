@@ -11,6 +11,8 @@ from queue import Empty, Queue
 
 import docker
 
+from ..metrics import active_sandboxes
+
 
 @dataclass
 class ExecutionResult:
@@ -111,6 +113,7 @@ class PtyExecutionStrategy(ExecutionStrategy):
         reader_thread.start()
 
         container.start()
+        active_sandboxes.inc()
 
         start = time.monotonic()
 
@@ -166,6 +169,7 @@ class PtyExecutionStrategy(ExecutionStrategy):
         finally:
             stop_event.set()
             reader_thread.join(timeout=2)
+            active_sandboxes.dec()
 
         try:
             result = container.wait(timeout=5)
