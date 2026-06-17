@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import io
+import base64
 import json
 import os
-import tarfile
 import threading
 import time
 from abc import ABC, abstractmethod
@@ -32,17 +31,11 @@ class PtyExecutionStrategy(ExecutionStrategy):
         self.stop_timeout_s = stop_timeout_s
         self.client = docker.from_env()
 
-    def _make_binary_tar(self, binary_dir: str) -> bytes:
-        buf = io.BytesIO()
-        with tarfile.open(fileobj=buf, mode="w") as tar:
-            bin_path = os.path.join(binary_dir, "programa")
-            with open(bin_path, "rb") as f:
-                info = tar.gettarinfo(fileobj=f, arcname="programa")
-                info.mode = 0o755
-                tar.addfile(info, f)
-        return buf.getvalue()
-
     def execute(self, binary_dir: str, ws, timeout_s: int) -> ExecutionResult:
+        bin_path = os.path.join(binary_dir, "programa")
+        with open(bin_path, "rb") as f:
+            binary_b64 = base64.b64encode(f.read()).decode()
+
         host_config = self.client.api.create_host_config(
             network_mode="none",
             mem_limit="128m",
@@ -54,7 +47,12 @@ class PtyExecutionStrategy(ExecutionStrategy):
         )
         container_id = self.client.api.create_container(
             image=self.image,
-            command=["/usr/bin/qemu-i386-static", "/tmp/programa"],
+            command=[
+                "sh", "-c",
+                f"echo {binary_b64} | base64 -d > /tmp/programa"
+                f" && chmod +x /tmp/programa"
+                f" && exec /usr/bin/qemu-i386-static /tmp/programa",
+            ],
             user="65534:65534",
             stdin_open=True,
             tty=True,
@@ -63,9 +61,6 @@ class PtyExecutionStrategy(ExecutionStrategy):
             stop_timeout=self.stop_timeout_s,
         )["Id"]
         container = self.client.containers.get(container_id)
-
-        tar_data = self._make_binary_tar(binary_dir)
-        container.put_archive("/tmp", tar_data)
 
         sock = container.attach_socket(
             params={"stdin": 1, "stdout": 1, "stderr": 1, "stream": 1}

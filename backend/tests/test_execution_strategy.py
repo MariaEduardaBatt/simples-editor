@@ -5,7 +5,7 @@ import os
 import tempfile
 import threading
 import time
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 
@@ -107,7 +107,7 @@ class TestPtyExecutionStrategy:
         )
         mock_client.api.create_container.assert_called_once_with(
             image="simples-runner:latest",
-            command=["/usr/bin/qemu-i386-static", "/tmp/programa"],
+            command=ANY,
             user="65534:65534",
             stdin_open=True,
             tty=True,
@@ -115,10 +115,13 @@ class TestPtyExecutionStrategy:
             host_config={"NetworkMode": "none"},
             stop_timeout=12,
         )
+        cmd = mock_client.api.create_container.call_args[1]["command"]
+        assert cmd[0] == "sh"
+        assert cmd[1] == "-c"
+        assert "qemu-i386-static" in cmd[2]
+        assert "base64 -d" in cmd[2]
+        assert "chmod +x" in cmd[2]
         mock_client.containers.get.assert_called_once_with("fake-container-id")
-        mock_container.put_archive.assert_called_once()
-        args, _ = mock_container.put_archive.call_args
-        assert args[0] == "/tmp"
 
     @patch("simples_backend.services.execution_strategy.docker")
     def test_execute_returns_result_with_exit_code_and_duration(self, mock_docker, binary_dir):
