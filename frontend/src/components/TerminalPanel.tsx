@@ -92,6 +92,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
       const disposeData = term.onData(handleData)
 
       terminalRef.current = term
+      ;(window as unknown as Record<string, unknown>).__xtermTerminal = term
 
       const resizeObserver = new ResizeObserver(() => {
         requestAnimationFrame(() => {
