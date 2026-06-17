@@ -30,6 +30,12 @@ services:
     image: redis:7-alpine
     expose:
       - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
     restart: unless-stopped
 
   backend:
@@ -53,8 +59,10 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
-      - runner_image_build
-      - redis
+      runner_image_build:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
   runner_image_build:
