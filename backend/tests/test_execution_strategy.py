@@ -102,6 +102,7 @@ class TestPtyExecutionStrategy:
             memswap_limit="128m",
             cpu_quota=50000,
             pids_limit=64,
+            read_only=True,
             tmpfs={"/tmp": "size=8m"},
             cap_drop=["ALL"],
         )

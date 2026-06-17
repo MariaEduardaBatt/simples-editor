@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import os
 import threading
 import time
@@ -12,6 +13,8 @@ from queue import Empty, Queue
 import docker
 
 from ..metrics import active_sandboxes
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -44,6 +47,7 @@ class PtyExecutionStrategy(ExecutionStrategy):
             memswap_limit="128m",
             cpu_quota=50000,
             pids_limit=64,
+            read_only=True,
             tmpfs={"/tmp": "size=8m"},
             cap_drop=["ALL"],
         )
@@ -62,6 +66,10 @@ class PtyExecutionStrategy(ExecutionStrategy):
             host_config=host_config,
             stop_timeout=self.stop_timeout_s,
         )["Id"]
+        logger.info("sandbox_container_created", extra={
+            "container_id": container_id,
+            "sandbox_image": self.image,
+        })
         container = self.client.containers.get(container_id)
 
         sock = container.attach_socket(
@@ -114,6 +122,9 @@ class PtyExecutionStrategy(ExecutionStrategy):
 
         container.start()
         active_sandboxes.inc()
+        logger.info("sandbox_container_started", extra={
+            "container_id": container_id,
+        })
 
         start = time.monotonic()
 
@@ -138,6 +149,10 @@ class PtyExecutionStrategy(ExecutionStrategy):
                     except Exception:
                         pass
                     timed_out = True
+                    logger.info("sandbox_container_timeout", extra={
+                        "container_id": container_id,
+                        "timeout_s": timeout_s,
+                    })
                     _send({"type": "timeout", "limit_s": timeout_s})
                     break
 
@@ -183,6 +198,13 @@ class PtyExecutionStrategy(ExecutionStrategy):
             container.remove(force=True)
         except Exception:
             pass
+
+        logger.info("sandbox_container_finished", extra={
+            "container_id": container_id,
+            "exit_code": exit_code,
+            "duration_ms": duration_ms,
+            "timed_out": timed_out,
+        })
 
         return ExecutionResult(
             exit_code=exit_code,
