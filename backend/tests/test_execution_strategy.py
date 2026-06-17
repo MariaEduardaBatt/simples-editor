@@ -316,3 +316,295 @@ class TestPtyExecutionStrategy:
         ]
         assert len(timeout_messages) >= 1
         assert timeout_messages[0]["limit_s"] == 0.05
+
+    @patch("simples_backend.services.execution_strategy.docker")
+    def test_stderr_forwarded_to_ws(self, mock_docker, binary_dir):
+        mock_client = MagicMock()
+        mock_docker.from_env.return_value = mock_client
+        mock_container, mock_sock, mock_ws = self._setup_mocks(
+            mock_client, binary_dir,
+            recv_side_effect=[
+                _docker_frame(2, b"error: segmentation fault\n"),
+                b"",
+            ],
+        )
+
+        strategy = PtyExecutionStrategy()
+        strategy.execute(binary_dir, mock_ws, timeout_s=10)
+
+        stderr_messages = [
+            json.loads(call[0][0])
+            for call in mock_ws.send.call_args_list
+            if json.loads(call[0][0]).get("type") == "stderr"
+        ]
+        assert len(stderr_messages) >= 1
+        assert "segmentation fault" in stderr_messages[0]["data"]
+
+    @patch("simples_backend.services.execution_strategy.docker")
+    def test_unknown_stream_id_handled(self, mock_docker, binary_dir):
+        mock_client = MagicMock()
+        mock_docker.from_env.return_value = mock_client
+        mock_container, mock_sock, mock_ws = self._setup_mocks(
+            mock_client, binary_dir,
+            recv_side_effect=[
+                _docker_frame(3, b"unknown stream"),
+                b"",
+            ],
+        )
+
+        strategy = PtyExecutionStrategy()
+        result = strategy.execute(binary_dir, mock_ws, timeout_s=10)
+
+        assert isinstance(result, ExecutionResult)
+
+    @patch("simples_backend.services.execution_strategy.docker")
+    def test_blocking_io_error_in_reader(self, mock_docker, binary_dir):
+        mock_client = MagicMock()
+        mock_docker.from_env.return_value = mock_client
+
+        mock_container = MagicMock()
+        mock_sock = MagicMock()
+        mock_sock._sock = MagicMock()
+        mock_container.attach_socket.return_value = mock_sock
+        mock_sock._sock.setblocking = MagicMock()
+
+        recv_calls = [
+            BlockingIOError,
+            _docker_frame(1, b"line after block\n"),
+            b"",
+        ]
+        mock_sock._sock.recv.side_effect = recv_calls
+
+        mock_container.wait.return_value = {"StatusCode": 0}
+        mock_ws = MagicMock()
+        mock_ws.receive.return_value = None
+
+        mock_client.api.create_host_config.return_value = {"NetworkMode": "none"}
+        mock_client.api.create_container.return_value = {"Id": "fake-container-id"}
+        mock_client.containers.get.return_value = mock_container
+        mock_container.put_archive = MagicMock()
+
+        mock_docker.from_env.return_value = mock_client
+
+        strategy = PtyExecutionStrategy()
+        result = strategy.execute(binary_dir, mock_ws, timeout_s=10)
+
+        assert result.exit_code == 0
+
+    @patch("simples_backend.services.execution_strategy.docker")
+    def test_ws_receive_exception_breaks_loop(self, mock_docker, binary_dir):
+        mock_client = MagicMock()
+        mock_docker.from_env.return_value = mock_client
+        mock_container, mock_sock, mock_ws = self._setup_mocks(
+            mock_client, binary_dir,
+            recv_side_effect=[_docker_frame(1, b"line1\n"), b""],
+            ws_receive=None,
+        )
+
+        mock_ws.receive.side_effect = RuntimeError("ws error")
+
+        strategy = PtyExecutionStrategy()
+        result = strategy.execute(binary_dir, mock_ws, timeout_s=10)
+
+        assert isinstance(result, ExecutionResult)
+
+    @patch("simples_backend.services.execution_strategy.docker")
+    def test_invalid_json_from_ws_discarded(self, mock_docker, binary_dir):
+        mock_client = MagicMock()
+        mock_docker.from_env.return_value = mock_client
+        mock_container, mock_sock, mock_ws = self._setup_mocks(
+            mock_client, binary_dir,
+            recv_side_effect=[b""],
+        )
+
+        mock_ws.receive.side_effect = [
+            "not json",
+            None,
+        ]
+
+        strategy = PtyExecutionStrategy()
+        result = strategy.execute(binary_dir, mock_ws, timeout_s=10)
+
+        assert isinstance(result, ExecutionResult)
+
+    @patch("simples_backend.services.execution_strategy.docker")
+    def test_container_wait_exception(self, mock_docker, binary_dir):
+        mock_client = MagicMock()
+        mock_docker.from_env.return_value = mock_client
+        mock_container, mock_sock, mock_ws = self._setup_mocks(
+            mock_client, binary_dir,
+            recv_side_effect=[b""],
+            ws_receive=None,
+        )
+
+        mock_container.wait.side_effect = RuntimeError("wait failed")
+
+        strategy = PtyExecutionStrategy()
+        result = strategy.execute(binary_dir, mock_ws, timeout_s=10)
+
+        assert result.exit_code == -1
+
+    @patch("simples_backend.services.execution_strategy.docker")
+    def test_container_remove_exception_caught(self, mock_docker, binary_dir):
+        mock_client = MagicMock()
+        mock_docker.from_env.return_value = mock_client
+        mock_container, mock_sock, mock_ws = self._setup_mocks(
+            mock_client, binary_dir,
+            recv_side_effect=[b""],
+            ws_receive=None,
+        )
+
+        mock_container.remove.side_effect = RuntimeError("remove failed")
+
+        strategy = PtyExecutionStrategy()
+        result = strategy.execute(binary_dir, mock_ws, timeout_s=10)
+
+        assert isinstance(result, ExecutionResult)
+        mock_container.remove.assert_called_once_with(force=True)
+
+    @patch("simples_backend.services.execution_strategy.docker")
+    def test_reader_incomplete_frame(self, mock_docker, binary_dir):
+        mock_client = MagicMock()
+        mock_docker.from_env.return_value = mock_client
+        mock_container, mock_sock, mock_ws = self._setup_mocks(
+            mock_client, binary_dir,
+            recv_side_effect=[
+                b"\x01\x00\x00\x00\x00\x00\x00\x10",  # header says 16 bytes payload
+                b"short",                               # only 5 bytes of payload
+                b"",                                     # EOF
+            ],
+            ws_receive=None,
+        )
+
+        strategy = PtyExecutionStrategy()
+        result = strategy.execute(binary_dir, mock_ws, timeout_s=10)
+
+        assert isinstance(result, ExecutionResult)
+
+    @patch("simples_backend.services.execution_strategy.docker")
+    def test_reader_unexpected_exception_caught(self, mock_docker, binary_dir):
+        mock_client = MagicMock()
+        mock_docker.from_env.return_value = mock_client
+        mock_container, mock_sock, mock_ws = self._setup_mocks(
+            mock_client, binary_dir,
+            recv_side_effect=[
+                _docker_frame(1, b"before crash\n"),
+                RuntimeError("reader crashed"),
+            ],
+            ws_receive=None,
+        )
+
+        mock_ws.receive.return_value = None
+        import time
+        orig_sleep = time.sleep
+        sleep_count = [0]
+
+        def counting_sleep(s):
+            sleep_count[0] += 1
+            if sleep_count[0] > 50:
+                mock_sock._sock.recv.side_effect = [b""]
+            orig_sleep(s)
+
+        with patch("simples_backend.services.execution_strategy.time.sleep", side_effect=counting_sleep):
+            strategy = PtyExecutionStrategy()
+            result = strategy.execute(binary_dir, mock_ws, timeout_s=10)
+
+        assert isinstance(result, ExecutionResult)
+
+    @patch("simples_backend.services.execution_strategy.docker")
+    def test_send_exception_caught(self, mock_docker, binary_dir):
+        mock_client = MagicMock()
+        mock_docker.from_env.return_value = mock_client
+        mock_container, mock_sock, mock_ws = self._setup_mocks(
+            mock_client, binary_dir,
+            recv_side_effect=[
+                _docker_frame(1, b"line\n"),
+                b"",
+            ],
+            ws_receive=None,
+        )
+
+        mock_ws.send.side_effect = RuntimeError("send failed")
+
+        strategy = PtyExecutionStrategy()
+        result = strategy.execute(binary_dir, mock_ws, timeout_s=10)
+
+        assert isinstance(result, ExecutionResult)
+
+    @patch("simples_backend.services.execution_strategy.docker")
+    def test_container_stop_exception_during_timeout(self, mock_docker, binary_dir):
+        mock_client = MagicMock()
+        mock_docker.from_env.return_value = mock_client
+        mock_container, mock_sock, mock_ws = self._setup_mocks(
+            mock_client, binary_dir,
+            recv_side_effect=[],
+            ws_receive=None,
+        )
+
+        reader_block = threading.Event()
+
+        def mock_recv(size):
+            reader_block.wait(timeout=10)
+            return b""
+
+        mock_sock._sock.recv = MagicMock(side_effect=mock_recv)
+        mock_container.wait.return_value = {"StatusCode": 137}
+        mock_container.stop.side_effect = RuntimeError("stop failed")
+
+        mock_ws = MagicMock()
+        mock_ws.receive.side_effect = lambda timeout=None: json.dumps({"type": "ping"})
+
+        strategy = PtyExecutionStrategy()
+        result = strategy.execute(binary_dir, mock_ws, timeout_s=0.05)
+
+        assert result.timed_out is True
+        mock_container.stop.assert_called_once_with(timeout=12)
+
+    @patch("simples_backend.services.execution_strategy.docker")
+    def test_invalid_json_from_ws_during_execution(self, mock_docker, binary_dir):
+        mock_client = MagicMock()
+        mock_docker.from_env.return_value = mock_client
+        mock_container, mock_sock, mock_ws = self._setup_mocks(
+            mock_client, binary_dir,
+            recv_side_effect=[
+                _docker_frame(1, b"line\n"),
+                _docker_frame(1, b"more\n"),
+                b"",
+            ],
+            ws_receive=None,
+        )
+
+        mock_ws.receive.side_effect = [
+            "not json",
+            None,
+        ]
+
+        strategy = PtyExecutionStrategy()
+        result = strategy.execute(binary_dir, mock_ws, timeout_s=10)
+
+        assert isinstance(result, ExecutionResult)
+
+    @patch("simples_backend.services.execution_strategy.docker")
+    def test_container_kill_exception_caught(self, mock_docker, binary_dir):
+        mock_client = MagicMock()
+        mock_docker.from_env.return_value = mock_client
+        mock_container, mock_sock, mock_ws = self._setup_mocks(
+            mock_client, binary_dir,
+            recv_side_effect=[
+                _docker_frame(1, b"line\n"),
+                b"",
+            ],
+            ws_receive=None,
+        )
+
+        mock_ws = MagicMock()
+        mock_ws.receive.side_effect = [
+            json.dumps({"type": "stop"}),
+            None,
+        ]
+        mock_container.kill.side_effect = RuntimeError("kill failed")
+
+        strategy = PtyExecutionStrategy()
+        result = strategy.execute(binary_dir, mock_ws, timeout_s=10)
+
+        assert isinstance(result, ExecutionResult)

@@ -283,3 +283,113 @@ class TestHandleWsConnection:
         handle_ws_connection(mock_ws, TEST_SETTINGS, identity=TEST_IDENTITY)
         sent = [json.loads(call[0][0]) for call in mock_ws.send.call_args_list]
         assert all(m.get("type") != "internal_error" for m in sent)
+
+    @patch("simples_backend.routes.run_ws.compile_simples")
+    def test_link_error_flow(self, mock_compile):
+        from simples_backend.services.execution_service import ExecutionError
+
+        mock_compile.return_value = "section .data\n"
+        mock_ws = MagicMock()
+        mock_ws.receive.side_effect = [
+            json.dumps({"type": "compile_and_run", "code": "programa test\ninicio\nfim"}),
+            None,
+        ]
+
+        with patch("simples_backend.routes.run_ws.assemble_nasm") as mock_asm:
+            mock_asm.return_value = "/tmp/programa.o"
+            with patch("simples_backend.routes.run_ws.link_object") as mock_link:
+                mock_link.side_effect = ExecutionError("link failed", "ld")
+                handle_ws_connection(mock_ws, TEST_SETTINGS, identity=TEST_IDENTITY)
+
+        sent = [json.loads(call[0][0]) for call in mock_ws.send.call_args_list]
+        assert any(m.get("type") == "link_error" for m in sent)
+
+    @patch("simples_backend.routes.run_ws.compile_simples")
+    def test_compile_error_no_phase(self, mock_compile):
+        from simples_backend.services.compiler_service import CompilerError
+
+        mock_compile.side_effect = CompilerError("compiler crashed")
+        mock_ws = MagicMock()
+        mock_ws.receive.side_effect = [
+            json.dumps({"type": "compile_and_run", "code": "programa test\ninicio\nfim"}),
+            None,
+        ]
+        handle_ws_connection(mock_ws, TEST_SETTINGS, identity=TEST_IDENTITY)
+
+        sent = [json.loads(call[0][0]) for call in mock_ws.send.call_args_list]
+        assert any(
+            m.get("type") == "internal_error" and m.get("message") == "compiler crashed"
+            for m in sent
+        )
+
+    @patch("simples_backend.routes.run_ws.compile_simples")
+    def test_unexpected_exception(self, mock_compile):
+        mock_compile.side_effect = RuntimeError("something unexpected")
+        mock_ws = MagicMock()
+        mock_ws.receive.side_effect = [
+            json.dumps({"type": "compile_and_run", "code": "programa test\ninicio\nfim"}),
+            None,
+        ]
+        handle_ws_connection(mock_ws, TEST_SETTINGS, identity=TEST_IDENTITY)
+
+        sent = [json.loads(call[0][0]) for call in mock_ws.send.call_args_list]
+        assert any(
+            m.get("type") == "internal_error" and "unexpected" in m.get("message", "")
+            for m in sent
+        )
+
+    def test_compile_and_run_when_not_idle_ignored(self):
+        mock_ws = MagicMock()
+        mock_ws.receive.side_effect = [
+            json.dumps({"type": "compile_and_run", "code": "first"}),
+            json.dumps({"type": "compile_and_run", "code": "second"}),
+            None,
+        ]
+
+        with patch("simples_backend.routes.run_ws.handle_compile_and_run") as mock_hcr:
+            from simples_backend.routes.run_ws import ConnectionState
+            mock_hcr.return_value = ConnectionState.COMPILING
+
+            handle_ws_connection(mock_ws, TEST_SETTINGS, identity=TEST_IDENTITY)
+
+        assert mock_hcr.call_count == 1
+
+    def test_ws_receive_exception_breaks_loop(self):
+        mock_ws = MagicMock()
+        mock_ws.receive.side_effect = [
+            RuntimeError("connection lost"),
+        ]
+        handle_ws_connection(mock_ws, TEST_SETTINGS, identity=TEST_IDENTITY)
+        mock_ws.close.assert_not_called()
+
+    def test_ws_close_exception_caught(self):
+        mock_ws = MagicMock()
+        mock_ws.close.side_effect = RuntimeError("close failed")
+        mock_ws.receive.side_effect = Exception("conn lost")
+
+        from simples_backend.auth import AuthError
+        with patch("simples_backend.routes.run_ws.extract_jwt_from_ws", side_effect=AuthError("missing_bearer_token")):
+            handle_ws_connection(mock_ws, TEST_SETTINGS)
+            mock_ws.close.assert_called_once()
+
+    @patch("simples_backend.routes.run_ws.compile_simples")
+    def test_compile_and_run_with_rate_limiter_exceeded(self, mock_compile):
+        from flask_limiter import Limiter
+        from flask_limiter.errors import RateLimitExceeded as LimiterRateLimitExceeded
+
+        mock_ws = MagicMock()
+        mock_ws.receive.side_effect = [
+            json.dumps({"type": "compile_and_run", "code": "programa test\ninicio\nfim"}),
+            None,
+        ]
+
+        limiter = MagicMock(spec=Limiter)
+        limiter.limit.side_effect = LimiterRateLimitExceeded(MagicMock())
+
+        handle_ws_connection(mock_ws, TEST_SETTINGS, limiter=limiter, identity=TEST_IDENTITY)
+
+        sent = [json.loads(call[0][0]) for call in mock_ws.send.call_args_list]
+        assert any(
+            m.get("type") == "internal_error" and "rate_limit_exceeded" in m.get("message", "")
+            for m in sent
+        )
