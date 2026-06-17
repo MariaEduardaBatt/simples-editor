@@ -1,0 +1,15 @@
+[run]
+source = src/simples_backend
+omit = */tests/*
+
+[report]
+fail_under = 70
+precision = 1
+show_missing = true
+skip_covered = false
+exclude_lines =
+    pragma: no cover
+    raise NotImplementedError
+    if __name__ == "__main__":
+    logger\.(info|debug|warning|error)
+    pass

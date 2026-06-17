@@ -116,6 +116,9 @@ def verify_supabase_jwt(token: str, secret: str, supabase_url: str = "") -> Iden
         logger.error("JWT invalid: %s: %s", type(exc).__name__, exc)
         raise AuthError("invalid_token") from exc
 
+    if claims is None:
+        raise AuthError("invalid_token")
+
     sub = cast(str | None, claims.get("sub"))
     if not sub:
         raise AuthError("invalid_token")
