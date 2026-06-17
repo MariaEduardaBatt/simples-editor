@@ -10,6 +10,7 @@ from flask_sock import Sock
 
 from ..auth import AuthError, verify_supabase_jwt
 from ..config import Settings
+from ..rate_limiter import RateLimitExceeded, SlidingWindowRateLimiter
 from ..services.compiler_service import CompilerError, compile_simples
 from ..services.execution_service import ExecutionError, assemble_nasm, link_object
 from ..services.execution_strategy import PtyExecutionStrategy
@@ -93,7 +94,13 @@ def handle_compile_and_run(ws, code: str, settings: Settings) -> ConnectionState
     return ConnectionState.IDLE
 
 
-def handle_ws_connection(ws, settings: Settings, identity: dict | None = None) -> None:
+def handle_ws_connection(
+    ws,
+    settings: Settings,
+    identity: dict | None = None,
+    user_limiter: SlidingWindowRateLimiter | None = None,
+    ip_limiter: SlidingWindowRateLimiter | None = None,
+) -> None:
     if identity is None:
         try:
             jwt_token = extract_jwt_from_ws()
@@ -133,6 +140,31 @@ def handle_ws_connection(ws, settings: Settings, identity: dict | None = None) -
                 logger.warning("ignored compile_and_run in state %s", state.name)
                 continue
 
+            user_id = identity["user_id"]
+
+            if user_limiter is not None:
+                try:
+                    user_limiter.check(user_id)
+                except RateLimitExceeded:
+                    _send(ws, {
+                        "type": "internal_error",
+                        "message": "rate_limit_exceeded",
+                        "detail": f"máximo de {settings.runs_per_minute} execuções por minuto",
+                    })
+                    continue
+
+            if ip_limiter is not None:
+                ip = request.remote_addr or "unknown"
+                try:
+                    ip_limiter.check(ip)
+                except RateLimitExceeded:
+                    _send(ws, {
+                        "type": "internal_error",
+                        "message": "rate_limit_exceeded",
+                        "detail": f"máximo de {settings.runs_per_minute_ip} execuções por minuto por IP",
+                    })
+                    continue
+
             code = msg.get("code", "")
             if not isinstance(code, str) or not code.strip():
                 _send(ws, {"type": "internal_error", "message": "missing code"})
@@ -158,7 +190,12 @@ def handle_ws_connection(ws, settings: Settings, identity: dict | None = None) -
             logger.warning("unknown message type '%s' discarded in state %s", t, state.name)
 
 
-def register_run_ws(sock: Sock, settings: Settings) -> None:
+def register_run_ws(
+    sock: Sock,
+    settings: Settings,
+    user_limiter: SlidingWindowRateLimiter | None = None,
+    ip_limiter: SlidingWindowRateLimiter | None = None,
+) -> None:
     @sock.route("/ws/run")
     def ws_run(ws):
-        handle_ws_connection(ws, settings)
+        handle_ws_connection(ws, settings, user_limiter=user_limiter, ip_limiter=ip_limiter)

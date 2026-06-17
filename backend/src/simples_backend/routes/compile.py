@@ -1,15 +1,20 @@
 from __future__ import annotations
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, g, jsonify, request
 
 from ..auth import verify_jwt
 from ..config import Settings
+from ..rate_limiter import RateLimitExceeded, SlidingWindowRateLimiter
 from ..services.compiler_service import CompilerError, compile_simples
 
 MAX_CODE_SIZE = 1_000_000
 
 
-def create_compile_blueprint(settings: Settings) -> Blueprint:
+def create_compile_blueprint(
+    settings: Settings,
+    user_limiter: SlidingWindowRateLimiter | None = None,
+    ip_limiter: SlidingWindowRateLimiter | None = None,
+) -> Blueprint:
     bp = Blueprint("compile", __name__)
 
     @bp.post("/compile")
@@ -25,6 +30,27 @@ def create_compile_blueprint(settings: Settings) -> Blueprint:
         code = data["code"]
         if not isinstance(code, str) or not code.strip():
             return jsonify({"error": "invalid_code"}), 400
+
+        user_id = g.identity["user_id"]
+
+        if user_limiter is not None:
+            try:
+                user_limiter.check(user_id)
+            except RateLimitExceeded:
+                return jsonify({
+                    "error": "rate_limit_exceeded",
+                    "detail": f"máximo de {settings.runs_per_minute} execuções por minuto",
+                }), 429
+
+        if ip_limiter is not None:
+            ip = request.remote_addr or "unknown"
+            try:
+                ip_limiter.check(ip)
+            except RateLimitExceeded:
+                return jsonify({
+                    "error": "rate_limit_exceeded",
+                    "detail": f"máximo de {settings.runs_per_minute_ip} execuções por minuto por IP",
+                }), 429
 
         try:
             nasm = compile_simples(code)
