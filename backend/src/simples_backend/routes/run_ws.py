@@ -8,6 +8,9 @@ from enum import Enum, auto
 from flask import request
 from flask_sock import Sock
 
+from flask_limiter import Limiter
+from flask_limiter.errors import RateLimitExceeded as LimiterRateLimitExceeded
+
 from ..auth import AuthError, verify_supabase_jwt
 from ..config import Settings
 from ..services.compiler_service import CompilerError, compile_simples
@@ -93,7 +96,12 @@ def handle_compile_and_run(ws, code: str, settings: Settings) -> ConnectionState
     return ConnectionState.IDLE
 
 
-def handle_ws_connection(ws, settings: Settings, identity: dict | None = None) -> None:
+def handle_ws_connection(
+    ws,
+    settings: Settings,
+    limiter: Limiter | None = None,
+    identity: dict | None = None,
+) -> None:
     if identity is None:
         try:
             jwt_token = extract_jwt_from_ws()
@@ -133,6 +141,27 @@ def handle_ws_connection(ws, settings: Settings, identity: dict | None = None) -
                 logger.warning("ignored compile_and_run in state %s", state.name)
                 continue
 
+            user_id = identity["user_id"]
+
+            if limiter is not None:
+                try:
+                    with limiter.limit(
+                        f"{settings.runs_per_minute}/minute",
+                        key_func=lambda: user_id,
+                    ):
+                        with limiter.limit(
+                            f"{settings.runs_per_minute_ip}/minute",
+                            key_func=lambda: request.remote_addr or "unknown",
+                        ):
+                            pass
+                except LimiterRateLimitExceeded:
+                    _send(ws, {
+                        "type": "internal_error",
+                        "message": "rate_limit_exceeded",
+                        "detail": "máximo de execuções por minuto excedido",
+                    })
+                    continue
+
             code = msg.get("code", "")
             if not isinstance(code, str) or not code.strip():
                 _send(ws, {"type": "internal_error", "message": "missing code"})
@@ -158,7 +187,11 @@ def handle_ws_connection(ws, settings: Settings, identity: dict | None = None) -
             logger.warning("unknown message type '%s' discarded in state %s", t, state.name)
 
 
-def register_run_ws(sock: Sock, settings: Settings) -> None:
+def register_run_ws(
+    sock: Sock,
+    settings: Settings,
+    limiter: Limiter | None = None,
+) -> None:
     @sock.route("/ws/run")
     def ws_run(ws):
-        handle_ws_connection(ws, settings)
+        handle_ws_connection(ws, settings, limiter=limiter)

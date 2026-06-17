@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import base64
 import json
+import os
 import threading
 import time
 from abc import ABC, abstractmethod
@@ -30,20 +32,27 @@ class PtyExecutionStrategy(ExecutionStrategy):
         self.client = docker.from_env()
 
     def execute(self, binary_dir: str, ws, timeout_s: int) -> ExecutionResult:
+        bin_path = os.path.join(binary_dir, "programa")
+        with open(bin_path, "rb") as f:
+            binary_b64 = base64.b64encode(f.read()).decode()
+
         host_config = self.client.api.create_host_config(
             network_mode="none",
             mem_limit="128m",
             memswap_limit="128m",
             cpu_quota=50000,
             pids_limit=64,
-            read_only=True,
             tmpfs={"/tmp": "size=8m"},
             cap_drop=["ALL"],
-            binds={binary_dir: {"bind": "/sandbox", "mode": "ro"}},
         )
         container_id = self.client.api.create_container(
             image=self.image,
-            command=["/usr/bin/qemu-i386-static", "/sandbox/programa"],
+            command=[
+                "sh", "-c",
+                f"echo {binary_b64} | base64 -d > /tmp/programa"
+                f" && chmod +x /tmp/programa"
+                f" && exec /usr/bin/qemu-i386-static /tmp/programa",
+            ],
             user="65534:65534",
             stdin_open=True,
             tty=True,

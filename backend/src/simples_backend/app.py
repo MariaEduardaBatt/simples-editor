@@ -3,6 +3,9 @@ from __future__ import annotations
 import logging
 
 from flask import Flask, jsonify
+from flask_limiter import Limiter
+from flask_limiter.errors import RateLimitExceeded as LimiterRateLimitExceeded
+from flask_limiter.util import get_remote_address
 from flask_sock import Sock
 
 from .auth import AuthError
@@ -11,6 +14,7 @@ from .routes import (
     create_auth_blueprint,
     create_compile_blueprint,
     create_health_blueprint,
+    create_limits_blueprint,
     register_run_ws,
 )
 
@@ -30,15 +34,34 @@ def create_app(settings: Settings | None = None) -> Flask:
     resolved = load_settings() if settings is None else settings
     app.config["SETTINGS"] = resolved
 
+    limiter = Limiter(
+        get_remote_address,
+        app=app,
+        storage_uri="memory://",
+        default_limits=[],
+        strategy="fixed-window",
+    )
+
     @app.errorhandler(AuthError)
     def handle_auth_error(exc: AuthError):
         return jsonify({"error": exc.code}), 401
 
+    @app.errorhandler(LimiterRateLimitExceeded)
+    def handle_rate_limit(exc: LimiterRateLimitExceeded):
+        return jsonify({
+            "error": "rate_limit_exceeded",
+            "detail": "máximo de execuções excedido",
+        }), 429
+
     app.register_blueprint(create_auth_blueprint(resolved), url_prefix="/api/auth")
-    app.register_blueprint(create_compile_blueprint(resolved), url_prefix="/api")
+    app.register_blueprint(
+        create_compile_blueprint(resolved, limiter=limiter),
+        url_prefix="/api",
+    )
     app.register_blueprint(create_health_blueprint(resolved), url_prefix="/api/health")
+    app.register_blueprint(create_limits_blueprint(resolved), url_prefix="/api")
 
     sock = Sock(app)
-    register_run_ws(sock, resolved)
+    register_run_ws(sock, resolved, limiter=limiter)
 
     return app

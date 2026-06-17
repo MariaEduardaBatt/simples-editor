@@ -40,6 +40,8 @@ services:
       - MAX_CODE_KB=${MAX_CODE_KB:-64}
       - SANDBOX_IMAGE=simples-runner:latest
       - STOP_TIMEOUT_S=${STOP_TIMEOUT_S:-12}
+      - RUNS_PER_MINUTE=${RUNS_PER_MINUTE:-30}
+      - RUNS_PER_MINUTE_IP=${RUNS_PER_MINUTE_IP:-120}
       - LOG_LEVEL=INFO
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

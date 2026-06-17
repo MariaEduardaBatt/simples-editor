@@ -14,6 +14,8 @@ class Settings:
     max_code_kb: int = 64
     sandbox_image: str = "simples-runner:latest"
     stop_timeout_s: int = 12
+    runs_per_minute: int = 30
+    runs_per_minute_ip: int = 120
 
 
 _REQUIRED_ENV_VARS = ("SUPABASE_URL", "JWT_SECRET")
@@ -46,4 +48,6 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         max_code_kb=_int_env(env, "MAX_CODE_KB", 64),
         sandbox_image=env.get("SANDBOX_IMAGE", "simples-runner:latest"),
         stop_timeout_s=_int_env(env, "STOP_TIMEOUT_S", 12),
+        runs_per_minute=_int_env(env, "RUNS_PER_MINUTE", 30),
+        runs_per_minute_ip=_int_env(env, "RUNS_PER_MINUTE_IP", 120),
     )
