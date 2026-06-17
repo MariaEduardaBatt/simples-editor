@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import logging
+import time
+
 from flask import Blueprint, g, jsonify, request
 from flask_limiter import Limiter
 
 from ..auth import verify_jwt
 from ..config import Settings
 from ..services.compiler_service import CompilerError, compile_simples
+
+logger = logging.getLogger(__name__)
 
 MAX_CODE_SIZE = 1_000_000
 
@@ -39,10 +44,23 @@ def create_compile_blueprint(
         if not isinstance(code, str) or not code.strip():
             return jsonify({"error": "invalid_code"}), 400
 
+        start = time.monotonic()
         try:
             nasm = compile_simples(code)
+            elapsed = int((time.monotonic() - start) * 1000)
+            logger.info(
+                "compile ok user=%s duration_ms=%d",
+                _user_key(), elapsed,
+                extra={"duration_ms": elapsed},
+            )
             return jsonify({"nasm": nasm})
         except CompilerError as e:
+            elapsed = int((time.monotonic() - start) * 1000)
+            logger.warning(
+                "compile error user=%s duration_ms=%d: %s",
+                _user_key(), elapsed, e.message,
+                extra={"duration_ms": elapsed},
+            )
             if e.phase is not None:
                 return jsonify({
                     "error": {

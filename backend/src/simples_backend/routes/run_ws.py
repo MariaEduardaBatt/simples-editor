@@ -3,9 +3,10 @@ from __future__ import annotations
 import json
 import logging
 import tempfile
+import time
 from enum import Enum, auto
 
-from flask import request
+from flask import g, request
 from flask_sock import Sock
 
 from flask_limiter import Limiter
@@ -47,8 +48,9 @@ def _send(ws, msg: dict) -> None:
         pass
 
 
-def handle_compile_and_run(ws, code: str, settings: Settings) -> ConnectionState:
+def handle_compile_and_run(ws, code: str, settings: Settings, identity: dict) -> ConnectionState:
     _send(ws, {"type": "compile_started"})
+    start = time.monotonic()
 
     try:
         with tempfile.TemporaryDirectory(prefix="sim-") as tmpdir:
@@ -58,12 +60,20 @@ def handle_compile_and_run(ws, code: str, settings: Settings) -> ConnectionState
             try:
                 obj_path = assemble_nasm(nasm, tmpdir, settings.compile_timeout_s)
             except ExecutionError as e:
+                logger.warning(
+                    "assemble failed: %s", e.message,
+                    extra={"user_id": identity.get("user_id", ""), "duration_ms": int((time.monotonic() - start) * 1000)},
+                )
                 _send(ws, {"type": "assemble_error", "stderr": e.message})
                 return ConnectionState.IDLE
 
             try:
                 bin_path = link_object(obj_path, tmpdir, settings.compile_timeout_s)
             except ExecutionError as e:
+                logger.warning(
+                    "link failed: %s", e.message,
+                    extra={"user_id": identity.get("user_id", ""), "duration_ms": int((time.monotonic() - start) * 1000)},
+                )
                 _send(ws, {"type": "link_error", "stderr": e.message})
                 return ConnectionState.IDLE
 
@@ -72,14 +82,31 @@ def handle_compile_and_run(ws, code: str, settings: Settings) -> ConnectionState
             strategy = PtyExecutionStrategy(image=settings.sandbox_image, stop_timeout_s=settings.stop_timeout_s)
             result = strategy.execute(tmpdir, ws, settings.exec_timeout_s)
 
+            elapsed = int((time.monotonic() - start) * 1000)
             if not result.timed_out:
                 _send(ws, {
                     "type": "exit",
                     "code": result.exit_code,
                     "duration_ms": result.duration_ms,
                 })
+            logger.info(
+                "compile_and_run %s code=%d user=%s duration_ms=%d",
+                "timeout" if result.timed_out else "done",
+                result.exit_code,
+                identity.get("user_id", ""),
+                elapsed,
+                extra={
+                    "user_id": identity.get("user_id", ""),
+                    "duration_ms": elapsed,
+                },
+            )
 
     except CompilerError as e:
+        elapsed = int((time.monotonic() - start) * 1000)
+        logger.warning(
+            "compile error: %s", e.message,
+            extra={"user_id": identity.get("user_id", ""), "duration_ms": elapsed},
+        )
         if e.phase is not None:
             _send(ws, {
                 "type": "compile_error",
@@ -91,6 +118,11 @@ def handle_compile_and_run(ws, code: str, settings: Settings) -> ConnectionState
         else:
             _send(ws, {"type": "internal_error", "message": e.message})
     except Exception as e:
+        elapsed = int((time.monotonic() - start) * 1000)
+        logger.error(
+            "unexpected error: %s", str(e),
+            extra={"user_id": identity.get("user_id", ""), "duration_ms": elapsed},
+        )
         _send(ws, {"type": "internal_error", "message": str(e)})
 
     return ConnectionState.IDLE
@@ -107,12 +139,18 @@ def handle_ws_connection(
             jwt_token = extract_jwt_from_ws()
             identity = verify_supabase_jwt(jwt_token, settings.supabase_jwt_secret, settings.supabase_url)
         except AuthError as e:
+            logger.info("ws auth failed: %s", e.code)
             _send(ws, {"type": "internal_error", "message": e.code})
             try:
                 ws.close()
             except Exception:
                 pass
             return
+
+    logger.info(
+        "ws connected user=%s", identity.get("user_id", ""),
+        extra={"user_id": identity.get("user_id", "")},
+    )
 
     state = ConnectionState.IDLE
 
@@ -172,7 +210,7 @@ def handle_ws_connection(
                 continue
 
             state = ConnectionState.COMPILING
-            state = handle_compile_and_run(ws, code, settings)
+            state = handle_compile_and_run(ws, code, settings, identity)
             continue
 
         if t == "stdin" and state != ConnectionState.EXECUTING:
