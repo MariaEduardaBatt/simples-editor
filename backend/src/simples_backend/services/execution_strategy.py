@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import io
 import json
+import os
+import tarfile
 import threading
 import time
 from abc import ABC, abstractmethod
@@ -29,6 +32,16 @@ class PtyExecutionStrategy(ExecutionStrategy):
         self.stop_timeout_s = stop_timeout_s
         self.client = docker.from_env()
 
+    def _make_binary_tar(self, binary_dir: str) -> bytes:
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w") as tar:
+            bin_path = os.path.join(binary_dir, "programa")
+            with open(bin_path, "rb") as f:
+                info = tar.gettarinfo(fileobj=f, arcname="programa")
+                info.mode = 0o755
+                tar.addfile(info, f)
+        return buf.getvalue()
+
     def execute(self, binary_dir: str, ws, timeout_s: int) -> ExecutionResult:
         host_config = self.client.api.create_host_config(
             network_mode="none",
@@ -39,11 +52,10 @@ class PtyExecutionStrategy(ExecutionStrategy):
             read_only=True,
             tmpfs={"/tmp": "size=8m"},
             cap_drop=["ALL"],
-            binds={binary_dir: {"bind": "/sandbox", "mode": "ro"}},
         )
         container_id = self.client.api.create_container(
             image=self.image,
-            command=["/usr/bin/qemu-i386-static", "/sandbox/programa"],
+            command=["/usr/bin/qemu-i386-static", "/tmp/programa"],
             user="65534:65534",
             stdin_open=True,
             tty=True,
@@ -52,6 +64,9 @@ class PtyExecutionStrategy(ExecutionStrategy):
             stop_timeout=self.stop_timeout_s,
         )["Id"]
         container = self.client.containers.get(container_id)
+
+        tar_data = self._make_binary_tar(binary_dir)
+        container.put_archive("/tmp", tar_data)
 
         sock = container.attach_socket(
             params={"stdin": 1, "stdout": 1, "stderr": 1, "stream": 1}

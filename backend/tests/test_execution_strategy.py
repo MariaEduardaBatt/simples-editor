@@ -78,6 +78,7 @@ class TestPtyExecutionStrategy:
         mock_client.api.create_host_config.return_value = {"NetworkMode": "none"}
         mock_client.api.create_container.return_value = {"Id": "fake-container-id"}
         mock_client.containers.get.return_value = mock_container
+        mock_container.put_archive = MagicMock()
 
         return mock_container, mock_sock, mock_ws
 
@@ -104,11 +105,10 @@ class TestPtyExecutionStrategy:
             read_only=True,
             tmpfs={"/tmp": "size=8m"},
             cap_drop=["ALL"],
-            binds={binary_dir: {"bind": "/sandbox", "mode": "ro"}},
         )
         mock_client.api.create_container.assert_called_once_with(
             image="simples-runner:latest",
-            command=["/usr/bin/qemu-i386-static", "/sandbox/programa"],
+            command=["/usr/bin/qemu-i386-static", "/tmp/programa"],
             user="65534:65534",
             stdin_open=True,
             tty=True,
@@ -117,6 +117,9 @@ class TestPtyExecutionStrategy:
             stop_timeout=12,
         )
         mock_client.containers.get.assert_called_once_with("fake-container-id")
+        mock_container.put_archive.assert_called_once()
+        args, _ = mock_container.put_archive.call_args
+        assert args[0] == "/tmp"
 
     @patch("simples_backend.services.execution_strategy.docker")
     def test_execute_returns_result_with_exit_code_and_duration(self, mock_docker, binary_dir):
