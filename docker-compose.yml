@@ -26,6 +26,12 @@ services:
       - VITE_WS_BASE=/ws
     restart: unless-stopped
 
+  redis:
+    image: redis:7-alpine
+    expose:
+      - "6379"
+    restart: unless-stopped
+
   backend:
     build:
       context: .
@@ -42,11 +48,13 @@ services:
       - STOP_TIMEOUT_S=${STOP_TIMEOUT_S:-12}
       - RUNS_PER_MINUTE=${RUNS_PER_MINUTE:-30}
       - RUNS_PER_MINUTE_IP=${RUNS_PER_MINUTE_IP:-120}
+      - REDIS_URL=redis://redis:6379/0
       - LOG_LEVEL=INFO
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       - runner_image_build
+      - redis
     restart: unless-stopped
 
   runner_image_build:

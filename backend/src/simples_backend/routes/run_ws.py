@@ -8,9 +8,11 @@ from enum import Enum, auto
 from flask import request
 from flask_sock import Sock
 
+from flask_limiter import Limiter
+from flask_limiter.errors import RateLimitExceeded as LimiterRateLimitExceeded
+
 from ..auth import AuthError, verify_supabase_jwt
 from ..config import Settings
-from ..rate_limiter import RateLimitExceeded, SlidingWindowRateLimiter
 from ..services.compiler_service import CompilerError, compile_simples
 from ..services.execution_service import ExecutionError, assemble_nasm, link_object
 from ..services.execution_strategy import PtyExecutionStrategy
@@ -97,9 +99,8 @@ def handle_compile_and_run(ws, code: str, settings: Settings) -> ConnectionState
 def handle_ws_connection(
     ws,
     settings: Settings,
+    limiter: Limiter | None = None,
     identity: dict | None = None,
-    user_limiter: SlidingWindowRateLimiter | None = None,
-    ip_limiter: SlidingWindowRateLimiter | None = None,
 ) -> None:
     if identity is None:
         try:
@@ -142,26 +143,22 @@ def handle_ws_connection(
 
             user_id = identity["user_id"]
 
-            if user_limiter is not None:
+            if limiter is not None:
                 try:
-                    user_limiter.check(user_id)
-                except RateLimitExceeded:
+                    with limiter.limit(
+                        f"{settings.runs_per_minute}/minute",
+                        key_func=lambda: user_id,
+                    ):
+                        with limiter.limit(
+                            f"{settings.runs_per_minute_ip}/minute",
+                            key_func=lambda: request.remote_addr or "unknown",
+                        ):
+                            pass
+                except LimiterRateLimitExceeded:
                     _send(ws, {
                         "type": "internal_error",
                         "message": "rate_limit_exceeded",
-                        "detail": f"máximo de {settings.runs_per_minute} execuções por minuto",
-                    })
-                    continue
-
-            if ip_limiter is not None:
-                ip = request.remote_addr or "unknown"
-                try:
-                    ip_limiter.check(ip)
-                except RateLimitExceeded:
-                    _send(ws, {
-                        "type": "internal_error",
-                        "message": "rate_limit_exceeded",
-                        "detail": f"máximo de {settings.runs_per_minute_ip} execuções por minuto por IP",
+                        "detail": "máximo de execuções por minuto excedido",
                     })
                     continue
 
@@ -193,9 +190,8 @@ def handle_ws_connection(
 def register_run_ws(
     sock: Sock,
     settings: Settings,
-    user_limiter: SlidingWindowRateLimiter | None = None,
-    ip_limiter: SlidingWindowRateLimiter | None = None,
+    limiter: Limiter | None = None,
 ) -> None:
     @sock.route("/ws/run")
     def ws_run(ws):
-        handle_ws_connection(ws, settings, user_limiter=user_limiter, ip_limiter=ip_limiter)
+        handle_ws_connection(ws, settings, limiter=limiter)

@@ -3,11 +3,13 @@ from __future__ import annotations
 import logging
 
 from flask import Flask, jsonify
+from flask_limiter import Limiter
+from flask_limiter.errors import RateLimitExceeded as LimiterRateLimitExceeded
+from flask_limiter.util import get_remote_address
 from flask_sock import Sock
 
 from .auth import AuthError
 from .config import Settings, load_settings
-from .rate_limiter import RateLimitExceeded, SlidingWindowRateLimiter
 from .routes import (
     create_auth_blueprint,
     create_compile_blueprint,
@@ -32,33 +34,35 @@ def create_app(settings: Settings | None = None) -> Flask:
     resolved = load_settings() if settings is None else settings
     app.config["SETTINGS"] = resolved
 
-    user_limiter = SlidingWindowRateLimiter(
-        max_requests=resolved.runs_per_minute, window_s=60
-    )
-    ip_limiter = SlidingWindowRateLimiter(
-        max_requests=resolved.runs_per_minute_ip, window_s=60
+    limiter = Limiter(
+        get_remote_address,
+        app=app,
+        storage_uri=resolved.redis_url,
+        default_limits=[],
+        storage_options={"connect_timeout": 5},
+        strategy="fixed-window",
     )
 
     @app.errorhandler(AuthError)
     def handle_auth_error(exc: AuthError):
         return jsonify({"error": exc.code}), 401
 
-    @app.errorhandler(RateLimitExceeded)
-    def handle_rate_limit(exc: RateLimitExceeded):
+    @app.errorhandler(LimiterRateLimitExceeded)
+    def handle_rate_limit(exc: LimiterRateLimitExceeded):
         return jsonify({
             "error": "rate_limit_exceeded",
-            "detail": f"máximo de {exc.max_requests} execuções por {exc.window_s}s",
+            "detail": "máximo de execuções excedido",
         }), 429
 
     app.register_blueprint(create_auth_blueprint(resolved), url_prefix="/api/auth")
     app.register_blueprint(
-        create_compile_blueprint(resolved, user_limiter=user_limiter, ip_limiter=ip_limiter),
+        create_compile_blueprint(resolved, limiter=limiter),
         url_prefix="/api",
     )
     app.register_blueprint(create_health_blueprint(resolved), url_prefix="/api/health")
     app.register_blueprint(create_limits_blueprint(resolved), url_prefix="/api")
 
     sock = Sock(app)
-    register_run_ws(sock, resolved, user_limiter=user_limiter, ip_limiter=ip_limiter)
+    register_run_ws(sock, resolved, limiter=limiter)
 
     return app

@@ -9,7 +9,6 @@ import pytest
 from simples_backend.config import Settings
 from simples_backend.rate_limiter import RateLimitExceeded, SlidingWindowRateLimiter
 
-
 TEST_SECRET = "0123456789abcdef0123456789abcdef"
 
 

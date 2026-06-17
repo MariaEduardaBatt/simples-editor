@@ -1,24 +1,32 @@
 from __future__ import annotations
 
 from flask import Blueprint, g, jsonify, request
+from flask_limiter import Limiter
 
 from ..auth import verify_jwt
 from ..config import Settings
-from ..rate_limiter import RateLimitExceeded, SlidingWindowRateLimiter
 from ..services.compiler_service import CompilerError, compile_simples
 
 MAX_CODE_SIZE = 1_000_000
 
 
+def _user_key() -> str:
+    identity = g.get("identity")
+    if identity:
+        return identity.get("user_id", "unknown")
+    return request.remote_addr or "unknown"
+
+
 def create_compile_blueprint(
     settings: Settings,
-    user_limiter: SlidingWindowRateLimiter | None = None,
-    ip_limiter: SlidingWindowRateLimiter | None = None,
+    limiter: Limiter | None = None,
 ) -> Blueprint:
     bp = Blueprint("compile", __name__)
 
     @bp.post("/compile")
     @verify_jwt(settings.supabase_jwt_secret)
+    @limiter.limit(lambda: f"{settings.runs_per_minute}/minute", key_func=_user_key)
+    @limiter.limit(lambda: f"{settings.runs_per_minute_ip}/minute", key_func=lambda: request.remote_addr or "unknown")
     def compile_code():
         if request.content_length and request.content_length > MAX_CODE_SIZE:
             return jsonify({"error": "code_too_large"}), 413
@@ -30,27 +38,6 @@ def create_compile_blueprint(
         code = data["code"]
         if not isinstance(code, str) or not code.strip():
             return jsonify({"error": "invalid_code"}), 400
-
-        user_id = g.identity["user_id"]
-
-        if user_limiter is not None:
-            try:
-                user_limiter.check(user_id)
-            except RateLimitExceeded:
-                return jsonify({
-                    "error": "rate_limit_exceeded",
-                    "detail": f"máximo de {settings.runs_per_minute} execuções por minuto",
-                }), 429
-
-        if ip_limiter is not None:
-            ip = request.remote_addr or "unknown"
-            try:
-                ip_limiter.check(ip)
-            except RateLimitExceeded:
-                return jsonify({
-                    "error": "rate_limit_exceeded",
-                    "detail": f"máximo de {settings.runs_per_minute_ip} execuções por minuto por IP",
-                }), 429
 
         try:
             nasm = compile_simples(code)
