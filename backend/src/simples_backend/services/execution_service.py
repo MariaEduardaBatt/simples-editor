@@ -40,7 +40,7 @@ def link_object(obj_path: str, tmpdir: str, timeout: int = 15) -> str:
     ld_path = shutil.which("i686-linux-gnu-ld") or "i686-linux-gnu-ld"
 
     result = subprocess.run(
-        [ld_path, "-m", "elf_i386", obj_path, "-o", bin_path],
+        [ld_path, "-m", "elf_i386", "-static", obj_path, "-o", bin_path],
         capture_output=True,
         text=True,
         timeout=timeout,
