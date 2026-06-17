@@ -3,7 +3,8 @@ from __future__ import annotations
 import logging
 import time
 
-from flask import Flask, g, jsonify, request
+from flask import Flask, Response, g, jsonify, request
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from flask_limiter import Limiter
 from flask_limiter.errors import RateLimitExceeded as LimiterRateLimitExceeded
@@ -13,6 +14,7 @@ from flask_sock import Sock
 from .auth import AuthError
 from .config import Settings, load_settings
 from .logging_config import configure_logging
+from .metrics import http_requests_total
 from .routes import (
     create_auth_blueprint,
     create_compile_blueprint,
@@ -52,6 +54,11 @@ def create_app(settings: Settings | None = None) -> Flask:
             response.status_code,
             extra={"duration_ms": duration_ms},
         )
+        http_requests_total.labels(
+            method=request.method,
+            endpoint=request.path,
+            status=response.status_code,
+        ).inc()
         return response
 
     limiter = Limiter(
@@ -80,6 +87,10 @@ def create_app(settings: Settings | None = None) -> Flask:
     )
     app.register_blueprint(create_health_blueprint(resolved), url_prefix="/api/health")
     app.register_blueprint(create_limits_blueprint(resolved), url_prefix="/api")
+
+    @app.route("/metrics")
+    def metrics():
+        return Response(generate_latest(), mimetype=CONTENT_TYPE_LATEST)
 
     sock = Sock(app)
     register_run_ws(sock, resolved, limiter=limiter)
