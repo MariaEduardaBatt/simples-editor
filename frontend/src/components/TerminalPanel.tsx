@@ -20,13 +20,6 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     const fitRef = useRef<FitAddon | null>(null)
     const stdinBufferRef = useRef('')
 
-    function flushBuffer() {
-      if (!stdinBufferRef.current) return
-      const line = stdinBufferRef.current + '\r'
-      stdinBufferRef.current = ''
-      onStdinRef.current?.(line)
-    }
-
     useImperativeHandle(
       ref,
       () => ({
