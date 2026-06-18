@@ -98,6 +98,20 @@ export function AppShell() {
     [ws],
   )
 
+  const handleClear = useCallback(() => {
+    setCode('')
+    setNasmOutput(undefined)
+    setCompileMarkers([])
+    terminalRef.current?.clear()
+  }, [])
+
+  const handleExampleSelect = useCallback((code: string) => {
+    setCode(code)
+    setNasmOutput(undefined)
+    setCompileMarkers([])
+    terminalRef.current?.clear()
+  }, [])
+
   async function handleLogout() {
     await signOut()
     navigate('/login', { replace: true })
@@ -130,7 +144,7 @@ export function AppShell() {
       </header>
 
       <div className="flex flex-1 flex-col overflow-hidden py-4">
-        <Toolbar code={code} onRun={handleRun} onStop={ws.stop} isRunning={isRunning} />
+        <Toolbar code={code} onRun={handleRun} onStop={ws.stop} isRunning={isRunning} onClear={handleClear} onExampleSelect={handleExampleSelect} />
 
         <div className="mx-6 mt-3 min-h-0 flex-1">
           <Group orientation="vertical" className="h-full">

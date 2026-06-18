@@ -111,7 +111,7 @@ class TestPtyExecutionStrategy:
             command=ANY,
             user="65534:65534",
             stdin_open=True,
-            tty=True,
+            tty=False,
             detach=True,
             host_config={"NetworkMode": "none"},
             stop_timeout=12,

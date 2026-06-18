@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import { Terminal } from 'xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import 'xterm/css/xterm.css'
@@ -39,12 +39,8 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
       [],
     )
 
-    const handleData = useCallback(
-      (data: string) => {
-        onStdin?.(data)
-      },
-      [onStdin],
-    )
+  const onStdinRef = useRef(onStdin)
+  onStdinRef.current = onStdin
 
     useEffect(() => {
       const container = containerRef.current
@@ -89,7 +85,22 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
       term.open(container)
       term.write('── Terminal aguardando execução ──\r\n')
 
-      const disposeData = term.onData(handleData)
+      const disposables: { dispose: () => void }[] = []
+
+      disposables.push(term.onData((data) => {
+        onStdinRef.current?.(data)
+      }))
+
+      disposables.push(term.onKey(({ key }) => {
+        if (key === '\r') {
+          term.write('\r\n')
+        } else if (key === '\x7f') {
+          term.write('\b \b')
+        } else if (key.length === 1 && key.charCodeAt(0) < 0x20 && key !== '\t') {
+        } else {
+          term.write(key)
+        }
+      }))
 
       terminalRef.current = term
       ;(window as unknown as Record<string, unknown>).__xtermTerminal = term
@@ -102,13 +113,13 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
       resizeObserver.observe(container)
 
       return () => {
-        disposeData.dispose()
+        for (const d of disposables) d.dispose()
         resizeObserver.disconnect()
         term.dispose()
         terminalRef.current = null
         fitRef.current = null
       }
-    }, [handleData])
+    }, [onStdin])
 
     useEffect(() => {
       const fitAddon = fitRef.current

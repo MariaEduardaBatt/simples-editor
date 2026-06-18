@@ -61,7 +61,7 @@ class PtyExecutionStrategy(ExecutionStrategy):
             ],
             user="65534:65534",
             stdin_open=True,
-            tty=True,
+            tty=False,
             detach=True,
             host_config=host_config,
             stop_timeout=self.stop_timeout_s,
