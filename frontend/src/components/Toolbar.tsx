@@ -90,7 +90,7 @@ inicio
       escreva i * j
       escreva " "
     fimpara
-    escreval ""
+  escreval ""
   fimpara
 fim`,
   },
