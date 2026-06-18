@@ -175,7 +175,7 @@ class PtyExecutionStrategy(ExecutionStrategy):
                         sock._sock.sendall(data.encode("utf-8"))
                 elif t == "stop":
                     try:
-                        container.kill(signal="SIGTERM")
+                        container.stop(timeout=0)
                     except Exception:
                         pass
                     break

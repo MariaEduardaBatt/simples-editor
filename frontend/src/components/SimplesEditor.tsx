@@ -20,12 +20,12 @@ const SIMPLES_TYPES = [
 const SIMPLES_OPERATORS = ["<-", "+", "-", "*", ">", "<", "=", "<>", ">=", "<="]
 
 const DEFAULT_CODE = `programa exemplo
-  inteiro x;
+  inteiro x
 inicio
-  escreva "Digite um numero: ";
-  leia x;
-  escreva "Voce digitou: ";
-  escreval x;
+  escreva "Digite um numero: "
+  leia x
+  escreva "Voce digitou: "
+  escreval x
 fim`
 
 function registerSimplesLanguage(monaco: Parameters<BeforeMount>[0]) {

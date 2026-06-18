@@ -18,6 +18,14 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     const containerRef = useRef<HTMLDivElement>(null)
     const terminalRef = useRef<Terminal | null>(null)
     const fitRef = useRef<FitAddon | null>(null)
+    const stdinBufferRef = useRef('')
+
+    function flushBuffer() {
+      if (!stdinBufferRef.current) return
+      const line = stdinBufferRef.current + '\r'
+      stdinBufferRef.current = ''
+      onStdinRef.current?.(line)
+    }
 
     useImperativeHandle(
       ref,
@@ -26,9 +34,11 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
           terminalRef.current?.write(data)
         },
         clear() {
+          stdinBufferRef.current = ''
           terminalRef.current?.clear()
         },
         reset() {
+          stdinBufferRef.current = ''
           const t = terminalRef.current
           if (t) {
             t.clear()
@@ -88,17 +98,31 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
       const disposables: { dispose: () => void }[] = []
 
       disposables.push(term.onData((data) => {
-        onStdinRef.current?.(data)
-      }))
+        for (let i = 0; i < data.length; i++) {
+          const ch = data[i]
 
-      disposables.push(term.onKey(({ key }) => {
-        if (key === '\r') {
-          term.write('\r\n')
-        } else if (key === '\x7f') {
-          term.write('\b \b')
-        } else if (key.length === 1 && key.charCodeAt(0) < 0x20 && key !== '\t') {
-        } else {
-          term.write(key)
+          if (ch === '\x7f') {
+            if (stdinBufferRef.current.length > 0) {
+              stdinBufferRef.current = stdinBufferRef.current.slice(0, -1)
+              term.write('\b \b')
+            }
+            continue
+          }
+
+          if (ch === '\r' || ch === '\n') {
+            const line = stdinBufferRef.current + '\r'
+            stdinBufferRef.current = ''
+            term.write('\r\n')
+            onStdinRef.current?.(line)
+            continue
+          }
+
+          if (ch.length === 1 && ch.charCodeAt(0) < 0x20 && ch !== '\t') {
+            continue
+          }
+
+          stdinBufferRef.current += ch
+          term.write(ch)
         }
       }))
 

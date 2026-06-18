@@ -238,7 +238,7 @@ class TestPtyExecutionStrategy:
         strategy = PtyExecutionStrategy()
         result = strategy.execute(binary_dir, mock_ws, timeout_s=10)
 
-        mock_container.kill.assert_any_call(signal="SIGTERM")
+        mock_container.stop.assert_any_call(timeout=0)
 
     @patch("simples_backend.services.execution_strategy.docker")
     def test_ping_pong(self, mock_docker, binary_dir):

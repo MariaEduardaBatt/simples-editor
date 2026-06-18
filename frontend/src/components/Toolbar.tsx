@@ -10,87 +10,87 @@ const EXAMPLES: Example[] = [
     name: 'Olá Mundo',
     code: `programa hello
 inicio
-  escreval "Ola, mundo!";
+  escreval "Ola, mundo!"
 fim`,
   },
   {
     name: 'Fatorial',
     code: `procedimento inteiro fatorial(inteiro n)
 inicio
-  inteiro i, resultado;
-  resultado <- 1;
+  inteiro i, resultado
+  resultado <- 1
   para i de 2 ate n passo 1 faca
-    resultado <- resultado * i;
+    resultado <- resultado * i
   fimpara
-  retorna resultado;
+  retorna resultado
 fim
 
 programa demo
-inteiro x;
+inteiro x
 inicio
-  escreva "digite um numero: ";
-  leia x;
-  escreva "fatorial de ";
-  escreva x;
-  escreva " = ";
-  escreval fatorial(x);
+  escreva "digite um numero: "
+  leia x
+  escreva "fatorial de "
+  escreva x
+  escreva " = "
+  escreval fatorial(x)
 fim`,
   },
   {
     name: 'Fibonacci',
     code: `procedimento inteiro fibonacci(inteiro n)
 inicio
-  inteiro i, a, b, tmp;
-  a <- 0;
-  b <- 1;
+  inteiro i, a, b, tmp
+  a <- 0
+  b <- 1
   se n = 0 entao
-    retorna 0;
+    retorna 0
   senao
     se n = 1 entao
-      retorna 1;
+      retorna 1
     senao
       para i de 2 ate n passo 1 faca
-        tmp <- a + b;
-        a <- b;
-        b <- tmp;
+        tmp <- a + b
+        a <- b
+        b <- tmp
       fimpara
-      retorna b;
+      retorna b
     fimse
   fimse
 fim
 
 programa demo
-inteiro n, i;
+inteiro n, i
 inicio
-  escreva "digite um numero: ";
-  leia n;
+  escreva "digite um numero: "
+  leia n
   se n > 46 entao
-    escreval "numero muito grande";
+    escreval "numero muito grande"
   senao
-    escreva "fibonacci ate ";
-    escreva n;
-    escreval ":";
+    escreva "fibonacci ate "
+    escreva n
+    escreval ":"
     para i de 0 ate n passo 1 faca
-      escreva fibonacci(i);
+      escreva fibonacci(i)
       se i < n entao
-        escreva " ";
+        escreva " "
       fimse
     fimpara
-    escreval "";
+    escreval ""
   fimse
 fim`,
   },
   {
     name: 'Tabuada',
     code: `programa tabuada
-inteiro i, j;
+inteiro i, j
 inicio
   para i de 1 ate 10 passo 1 faca
     para j de 1 ate 10 passo 1 faca
-      escreva i * j;
-      escreva " ";
+      escreva i * j
+      escreva " "
     fimpara
-    escreval "";
+    escreval ""
   fimpara
 fim`,
   },
