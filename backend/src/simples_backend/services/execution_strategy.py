@@ -99,6 +99,8 @@ class PtyExecutionStrategy(ExecutionStrategy):
                         while len(buf) >= 8:
                             stream_id = buf[0]
                             if stream_id not in (1, 2):
+                                output_queue.put(("stdout", buf))
+                                buf = b""
                                 break
                             payload_len = int.from_bytes(buf[4:8], "big")
                             frame_size = 8 + payload_len
@@ -172,7 +174,10 @@ class PtyExecutionStrategy(ExecutionStrategy):
                 if t == "stdin":
                     data = msg.get("data", "")
                     if data:
-                        sock._sock.sendall(data.encode("utf-8"))
+                        try:
+                            sock._sock.sendall(data.encode("utf-8"))
+                        except OSError:
+                            pass
                 elif t == "stop":
                     try:
                         container.kill(signal="SIGTERM")

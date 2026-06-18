@@ -8,6 +8,7 @@ import { NasmPanel } from '../components/NasmPanel'
 import { TerminalPanel, type TerminalPanelHandle } from '../components/TerminalPanel'
 import { Toolbar } from '../components/Toolbar'
 import { useRunWebSocket } from '../hooks/useRunWebSocket'
+import type { Example } from '../lib/examples'
 
 export function AppShell() {
   const navigate = useNavigate()
@@ -91,6 +92,17 @@ export function AppShell() {
     setCode(newCode)
   }, [])
 
+  const handleClear = useCallback(() => {
+    terminalRef.current?.clear()
+  }, [])
+
+  const handleExampleSelect = useCallback((example: Example) => {
+    setCode(example.code)
+    setNasmOutput(undefined)
+    setCompileMarkers([])
+    terminalRef.current?.clear()
+  }, [])
+
   const handleRun = useCallback(
     (source: string) => {
       ws.start(source)
@@ -130,7 +142,7 @@ export function AppShell() {
       </header>
 
       <div className="flex flex-1 flex-col overflow-hidden py-4">
-        <Toolbar code={code} onRun={handleRun} onStop={ws.stop} isRunning={isRunning} />
+        <Toolbar code={code} onRun={handleRun} onStop={ws.stop} isRunning={isRunning} onExampleSelect={handleExampleSelect} onClear={handleClear} />
 
         <div className="mx-6 mt-3 min-h-0 flex-1">
           <Group orientation="vertical" className="h-full">

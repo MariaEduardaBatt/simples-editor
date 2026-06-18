@@ -41,6 +41,20 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
 
     const handleData = useCallback(
       (data: string) => {
+        const term = terminalRef.current
+        if (term) {
+          for (const ch of data) {
+            if (ch === '\r') {
+              term.write('\r\n')
+            } else if (ch === '\x7f' || ch === '\b') {
+              term.write('\b \b')
+            } else if (ch === '\t') {
+              term.write('\t')
+            } else if (ch >= ' ') {
+              term.write(ch)
+            }
+          }
+        }
         onStdin?.(data)
       },
       [onStdin],
