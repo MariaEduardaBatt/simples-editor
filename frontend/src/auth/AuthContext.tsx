@@ -3,11 +3,13 @@ import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 
 type SignInFn = (email: string, password: string) => ReturnType<typeof supabase.auth.signInWithPassword>
+type SignUpFn = (email: string, password: string) => ReturnType<typeof supabase.auth.signUp>
 
 type AuthContextValue = {
   session: Session | null
   loading: boolean
   signIn: SignInFn
+  signUp: SignUpFn
   signOut: typeof supabase.auth.signOut
 }
 
@@ -45,6 +47,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       session,
       loading,
       signIn: (email, password) => supabase.auth.signInWithPassword({ email, password }),
+      signUp: (email, password) => supabase.auth.signUp({ email, password }),
       signOut: () => supabase.auth.signOut()
     }),
     [loading, session]
